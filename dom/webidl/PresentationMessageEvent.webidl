@@ -6,8 +6,7 @@
 
 [Constructor(DOMString typeArg,
  optional PresentationMessageEventInit eventInitDict),
- Pref="dom.presentation.enabled",
- AvailableIn="PrivilegedApps"]
+ Pref="dom.presentation.enabled"]
 interface PresentationMessageEvent : Event
 {
   readonly attribute any data;

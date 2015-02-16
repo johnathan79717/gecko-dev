@@ -24,6 +24,7 @@ EXTRA_COMPONENTS += [
     'HelperAppDialog.js',
     'LoginManagerPrompter.js',
     'NSSDialogService.js',
+    'PresentationDevicePrompt.js',
     'PromptService.js',
     'SessionStore.js',
     'Sidebar.js',

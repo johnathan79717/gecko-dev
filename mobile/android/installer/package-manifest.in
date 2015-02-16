@@ -460,6 +460,9 @@
 @BINPATH@/components/PresentationDeviceInfoManager.manifest
 @BINPATH@/components/PresentationDeviceInfoManager.js
 
+@BINPATH@/components/BuiltinProviders.manifest
+@BINPATH@/components/DemoProvider.js
+
 ; Modules
 @BINPATH@/modules/*
 
@@ -619,6 +622,7 @@ bin/components/@DLL_PREFIX@nkgnomevfs@DLL_SUFFIX@
 @BINPATH@/components/MobileComponents.manifest
 @BINPATH@/components/MobileComponents.xpt
 @BINPATH@/components/NSSDialogService.js
+@BINPATH@/components/PresentationDevicePrompt.js
 @BINPATH@/components/PromptService.js
 @BINPATH@/components/SessionStore.js
 @BINPATH@/components/Sidebar.js

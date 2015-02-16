@@ -10,7 +10,7 @@
  * W3C liability, trademark and document use rules apply.
  */
 
-[Pref="dom.presentation.enabled", AvailableIn="PrivilegedApps"]
+[Pref="dom.presentation.enabled"]
 interface Presentation : EventTarget {
   /**
    * The requesting page use this function to start a new session, and the

@@ -15,12 +15,12 @@
 #include "nsIEventTarget.h"
 #include "nsIThread.h"
 
-#if defined(MOZ_WIDGET_GONK)
+// #if defined(MOZ_WIDGET_GONK)
 #include <android/log.h>
 #define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "Presentation", args);
-#else
-#define LOG(args...)  printf(args);
-#endif
+// #else
+// #define LOG(args...)  printf(args);
+// #endif
 
 namespace mozilla {
 namespace dom {

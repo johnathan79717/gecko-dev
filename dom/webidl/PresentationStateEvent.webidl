@@ -6,8 +6,7 @@
 
 [Constructor(DOMString typeArg,
  optional PresentationStateEventInit eventInitDict),
- Pref="dom.presentation.enabled",
- AvailableIn="PrivilegedApps"]
+ Pref="dom.presentation.enabled"]
 interface PresentationStateEvent : Event
 {
 //  readonly attribute PresentationSessionState state;
