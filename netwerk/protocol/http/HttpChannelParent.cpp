@@ -35,6 +35,11 @@
 #include "nsIHttpHeaderVisitor.h"
 #include "nsQueryObject.h"
 
+#ifdef MOZ_WIDGET_GONK
+  #undef LOG
+  #define LOG(args) printf_stderr args
+#endif
+
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
 
@@ -143,6 +148,7 @@ NS_IMPL_ISUPPORTS(HttpChannelParent,
                   nsIProgressEventSink,
                   nsIRequestObserver,
                   nsIStreamListener,
+                  nsIPackagedAppChannelListener,
                   nsIParentChannel,
                   nsIAuthPromptProvider,
                   nsIParentRedirectingChannel,
@@ -467,6 +473,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   schedulingContextID.Parse(aSchedulingContextID.BeginReading());
   mChannel->SetSchedulingContextID(schedulingContextID);
 
+  LOG(("HttpChannelParent::AsyncOpen with listener: %p", mParentListener.get()));
   rv = mChannel->AsyncOpen(mParentListener, nullptr);
   if (NS_FAILED(rv))
     return SendFailedAsyncOpen(rv);
@@ -480,7 +487,7 @@ HttpChannelParent::ConnectChannel(const uint32_t& channelId, const bool& shouldI
   nsresult rv;
 
   LOG(("HttpChannelParent::ConnectChannel: Looking for a registered channel "
-       "[this=%p, id=%lu]\n", this, channelId));
+       "[this=%p, id=%d]\n", this, channelId));
   nsCOMPtr<nsIChannel> channel;
   rv = NS_LinkRedirectChannels(channelId, this, getter_AddRefs(channel));
   mChannel = static_cast<nsHttpChannel*>(channel.get());
@@ -768,6 +775,38 @@ HttpChannelParent::RecvDivertComplete()
   return true;
 }
 
+bool
+HttpChannelParent::ShouldSwitchProcess(const nsACString& aNewOrigin)
+{
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  mChannel->GetLoadInfo(getter_AddRefs(loadInfo));
+
+  nsCOMPtr<nsIPrincipal> loadingPrincipal;
+  loadInfo->GetLoadingPrincipal(getter_AddRefs(loadingPrincipal));
+
+  nsCString loadingOriginNoSuffix;
+  loadingPrincipal->GetOriginNoSuffix(loadingOriginNoSuffix);
+
+  LOG(("Loading origin: %s, package origin: %s", loadingOriginNoSuffix.get(),
+                                                 nsCString(aNewOrigin).get()));
+
+  return !aNewOrigin.Equals(loadingOriginNoSuffix);
+}
+
+//-----------------------------------------------------------------------------
+// HttpChannelParent::nsIPackagedAppChannelListener
+//-----------------------------------------------------------------------------
+NS_IMETHODIMP
+HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aNewOrigin)
+{
+  LOG(("HttpChannelParent::OnStartSignedPackageRequest"));
+  if (ShouldSwitchProcess(aNewOrigin)) {
+    mChannel->Cancel(NS_ERROR_UNKNOWN_HOST);
+    mTabParent->OnStartSignedPackageRequest(aNewOrigin);
+  }
+  return NS_OK;
+}
+
 //-----------------------------------------------------------------------------
 // HttpChannelParent::nsIRequestObserver
 //-----------------------------------------------------------------------------
@@ -1021,7 +1060,7 @@ HttpChannelParent::StartRedirect(uint32_t newChannelId,
                                  uint32_t redirectFlags,
                                  nsIAsyncVerifyRedirectCallback* callback)
 {
-  LOG(("HttpChannelParent::StartRedirect [this=%p, newChannelId=%lu "
+  LOG(("HttpChannelParent::StartRedirect [this=%p, newChannelId=%d "
        "newChannel=%p callback=%p]\n", this, newChannelId, newChannel,
        callback));
 

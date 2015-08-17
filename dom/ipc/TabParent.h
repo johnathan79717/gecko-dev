@@ -438,6 +438,8 @@ public:
     virtual PWebBrowserPersistDocumentParent* AllocPWebBrowserPersistDocumentParent(const uint64_t& aOuterWindowID) override;
     virtual bool DeallocPWebBrowserPersistDocumentParent(PWebBrowserPersistDocumentParent* aActor) override;
 
+    void OnStartSignedPackageRequest(const nsACString& aNewOrigin);
+
 protected:
     bool ReceiveMessage(const nsString& aMessage,
                         bool aSync,
