@@ -1597,7 +1597,7 @@ nsDocShell::LoadStream(nsIInputStream* aStream, nsIURI* aURI,
     (void)aLoadInfo->GetLoadType(&lt);
     // Get the appropriate LoadType from nsIDocShellLoadInfo type
     loadType = ConvertDocShellLoadInfoToLoadType(lt);
-  
+
     nsCOMPtr<nsISupports> owner;
     aLoadInfo->GetOwner(getter_AddRefs(owner));
     requestingPrincipal = do_QueryInterface(owner);
@@ -5161,6 +5161,8 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
   // end of the URL, so append it last.
   errorPageUrl.AppendLiteral("&d=");
   errorPageUrl.AppendASCII(escapedDescription.get());
+
+  errorPageUrl = "about:blank";
 
   nsCOMPtr<nsIURI> errorPageURI;
   rv = NS_NewURI(getter_AddRefs(errorPageURI), errorPageUrl);

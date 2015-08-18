@@ -16,6 +16,7 @@
 #include "mozilla/Logging.h"
 #include "mozilla/DebugOnly.h"
 #include "nsIHttpHeaderVisitor.h"
+#include "mozilla/LoadContext.h"
 
 #define TESTING_SIGNATURE "Testing signature"
 
@@ -42,7 +43,7 @@ NS_IMPL_ISUPPORTS(PackagedAppService::CacheEntryWriter, nsIStreamListener)
 static void
 LogURI(const char *aFunctionName, void *self, nsIURI *aURI, nsILoadContextInfo *aInfo = nullptr)
 {
-  if (MOZ_LOG_TEST(gPASLog, LogLevel::Debug)) {
+  //if (MOZ_LOG_TEST(gPASLog, LogLevel::Debug)) {
     nsAutoCString spec;
     if (aURI) {
       aURI->GetAsciiSpec(spec);
@@ -57,7 +58,7 @@ LogURI(const char *aFunctionName, void *self, nsIURI *aURI, nsILoadContextInfo *
     }
 
     LOG(("[%p] %s > %s%s\n", self, aFunctionName, prefix.get(), spec.get()));
-  }
+  //}
 }
 
 namespace {
@@ -979,6 +980,9 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
 
   nsRefPtr<PackagedAppChannelListener> listener =
     new PackagedAppChannelListener(downloader, mimeConverter);
+
+  nsRefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
+  channel->SetNotificationCallbacks(loadContext);
 
   return channel->AsyncOpen(listener, nullptr);
 }
