@@ -96,6 +96,7 @@
 #include "UnitTransforms.h"
 #include <algorithm>
 #include "mozilla/WebBrowserPersistDocumentParent.h"
+#include "TabParentLRU.h"
 
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
@@ -275,6 +276,7 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mManager(aManager)
   , mMarkedDestroying(false)
   , mIsDestroyed(false)
+  , mIsDetached(true)
   , mAppPackageFileDescriptorSent(false)
   , mSendOfflineStatus(true)
   , mChromeFlags(aChromeFlags)
@@ -470,6 +472,41 @@ TabParent::Destroy()
   }
 
   mMarkedDestroying = true;
+}
+
+void
+TabParent::Detach()
+{
+  if (mIsDetached) {
+    return;
+  }
+  RemoveWindowListeners();
+  if (RenderFrameParent* frame = GetRenderFrame()) {
+    RemoveTabParentFromTable(frame->GetLayersId());
+  }
+  if (XRE_IsParentProcess()) {
+    Manager()->AsContentParent()->CacheTabParent(this);
+  }
+  mIsDetached = true;
+}
+
+void
+TabParent::Attach(nsFrameLoader* aFrameLoader)
+{
+  MOZ_ASSERT(mIsDetached);
+  if (!mIsDetached) {
+    return;
+  }
+  Element* ownerElement = aFrameLoader->GetOwnerContent();
+  SetOwnerElement(ownerElement);
+  if (RenderFrameParent* frame = GetRenderFrame()) {
+    AddTabParentToTable(frame->GetLayersId(), this);
+    frame->OwnerContentChanged(ownerElement);
+  }
+  if (XRE_IsParentProcess()) {
+    Manager()->AsContentParent()->TakeTabParent(this);
+  }
+  mIsDetached = false;
 }
 
 bool
@@ -3395,6 +3432,42 @@ TabParent::StartPersistence(uint64_t aOuterWindowID,
   return SendPWebBrowserPersistDocumentConstructor(actor, aOuterWindowID)
     ? NS_OK : NS_ERROR_FAILURE;
   // (The actor will be destroyed on constructor failure.)
+}
+
+bool
+TabParent::RecvLocationChange(const URIParams& aCurrentURI)
+{
+  mCurrentLocation = DeserializeURI(aCurrentURI);
+  return true;
+}
+
+already_AddRefed<nsIURI>
+TabParent::GetCurrentLocation()
+{
+  nsCOMPtr<nsIURI> uri = mCurrentLocation;
+  return uri.forget();
+}
+
+bool
+TabParent::SendGotoBFCache()
+{
+  TabParentLRU* lru = TabParentLRU::GetSingleton();
+  if (PBrowserParent::SendGotoBFCache()) {
+    lru->Add(this);
+    return true;
+  }
+  return false;
+}
+
+bool
+TabParent::SendResumeFromBFCache()
+{
+  TabParentLRU* lru = TabParentLRU::GetSingleton();
+  if (PBrowserParent::SendResumeFromBFCache()) {
+    lru->Remove(this);
+    return true;
+  }
+  return false;
 }
 
 NS_IMETHODIMP
