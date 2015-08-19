@@ -801,8 +801,13 @@ HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aNewOrigin)
 {
   LOG(("HttpChannelParent::OnStartSignedPackageRequest"));
   if (ShouldSwitchProcess(aNewOrigin)) {
+    LOG(("We decide to switch process. Call TabParent::SwitchProcessAndLoadURIs"));
+
+    nsCOMPtr<nsIURI> uri;
+    mChannel->GetURI(getter_AddRefs(uri));
+
     mChannel->Cancel(NS_ERROR_UNKNOWN_HOST);
-    mTabParent->OnStartSignedPackageRequest(aNewOrigin);
+    mTabParent->SwitchProcessAndLoadURI(uri);
   }
   return NS_OK;
 }

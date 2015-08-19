@@ -106,6 +106,11 @@ using namespace mozilla::services;
 using namespace mozilla::widget;
 using namespace mozilla::jsipc;
 
+#ifdef MOZ_WIDGET_GONK
+  #undef LOG
+  #define LOG(args) printf_stderr args
+#endif
+
 // The flags passed by the webProgress notifications are 16 bits shifted
 // from the ones registered by webProgressListeners.
 #define NOTIFY_FLAG_SHIFT 16
@@ -434,9 +439,18 @@ TabParent::IsVisible()
 }
 
 void
-TabParent::OnStartSignedPackageRequest(const nsACString& aNewOrigin)
+TabParent::SwitchProcessAndLoadURI(nsIURI* aURI)
 {
   // Switch process if needed.
+
+  nsRefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
+  if (!frameLoader) {
+    LOG(("No frame loader in this tab. What up?!"));
+    return;
+  }
+
+  LOG(("Switch to new process and load URI"));
+  //frameLoader->SwitchProcessAndLoadURI(aURI);
 }
 
 void
@@ -2447,7 +2461,7 @@ TabParent::RecvStartPluginIME(const WidgetKeyboardEvent& aKeyboardEvent,
     return true;
   }
   widget->StartPluginIME(aKeyboardEvent,
-                         (int32_t&)aPanelX, 
+                         (int32_t&)aPanelX,
                          (int32_t&)aPanelY,
                          *aCommitted);
   return true;
@@ -3355,7 +3369,7 @@ TabParent::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
   }
   mDragAreaX = aDragAreaX;
   mDragAreaY = aDragAreaY;
-  
+
   esm->BeginTrackingRemoteDragGesture(mFrameElement);
 
   return true;

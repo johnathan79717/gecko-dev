@@ -891,6 +891,23 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
     return NS_ERROR_INVALID_ARG;
   }
 
+  /////////////////////////////////////////////////////////////
+  {
+    nsCOMPtr<nsIChannel> channel = do_QueryInterface(aCallback);
+
+    nsCOMPtr<nsILoadInfo> loadInfo;
+    channel->GetLoadInfo(getter_AddRefs(loadInfo));
+
+    nsCOMPtr<nsIPrincipal> loadingPrincipal;
+    loadInfo->GetLoadingPrincipal(getter_AddRefs(loadingPrincipal));
+
+    nsCString loadingOrigin;
+    loadingPrincipal->GetOrigin(loadingOrigin);
+
+    LOG(("PackagedAppService::GetResource  >  Loading origin: %s", loadingOrigin.get()));
+  }
+  /////////////////////////////////////////////////////////////
+
   nsresult rv;
 
   nsCOMPtr<nsIURI> uri;
