@@ -51,6 +51,9 @@ extern PRThread *gSocketThread;
 
 //-----------------------------------------------------------------------------
 
+
+#define LOG
+
 static NS_DEFINE_CID(kMultiplexInputStream, NS_MULTIPLEXINPUTSTREAM_CID);
 
 // Place a limit on how much non-compliant HTTP can be skipped while
@@ -1641,7 +1644,7 @@ nsHttpTransaction::HandleContent(char *buf,
 {
     nsresult rv;
 
-    LOG(("nsHttpTransaction::HandleContent [this=%p count=%u]\n", this, count));
+    //LOG(("nsHttpTransaction::HandleContent [this=%p count=%u]\n", this, count));
 
     *contentRead = 0;
     *contentRemaining = 0;

@@ -645,6 +645,16 @@ PackagedAppService::PackagedAppDownloader::AddCallback(nsIURI *aURI,
       // need to wait for it to be inserted in the cache and we can serve it
       // right now, directly.  See also the CallCallbacks method bellow.
       LOG(("[%p]    > already downloaded\n", this));
+
+      // This is the case where a package downloader is still running and we peek data 
+      // from it.
+      nsCOMPtr<nsIPackagedAppChannelListener> requester = do_QueryInterface(aCallback);
+      if (requester) {
+        // TODO: Notify OnStartSignedPackageRequest if necessary.
+        LOG(("Remove the requester since it's no longer needed."));
+        RemoveRequester(requester);
+      }
+
       mCacheStorage->AsyncOpenURI(aURI, EmptyCString(),
                                   nsICacheStorage::OPEN_READONLY, aCallback);
     } else {
@@ -681,6 +691,7 @@ PackagedAppService::PackagedAppDownloader::CallCallbacks(nsIURI *aURI,
 
   nsCOMArray<nsICacheEntryOpenCallback>* array = mCallbacks.Get(spec);
   if (array) {
+    uint32_t callbacksNum = array->Length();
     // Call all the callbacks for this URI
     for (uint32_t i = 0; i < array->Length(); ++i) {
       nsCOMPtr<nsICacheEntryOpenCallback> callback(array->ObjectAt(i));
@@ -692,7 +703,7 @@ PackagedAppService::PackagedAppDownloader::CallCallbacks(nsIURI *aURI,
     // An empty array means that the resource was already downloaded, and a
     // new call to AddCallback can simply return it from the cache.
     array->Clear();
-    LOG(("[%p]    > called callbacks\n", this));
+    LOG(("[%p]    > called callbacks (%d)\n", this, callbacksNum));
   } else {
     // There were no listeners waiting for this resource, but we insert a new
     // empty array into the hashtable so if any new callbacks are added while
@@ -704,6 +715,19 @@ PackagedAppService::PackagedAppDownloader::CallCallbacks(nsIURI *aURI,
   }
 
   aEntry->ForceValidFor(0);
+  return NS_OK;
+}
+
+nsresult
+PackagedAppService::PackagedAppDownloader::RemoveCallbacks(nsICacheEntryOpenCallback* aCallback)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread(), "mCallbacks hashtable is not thread safe");
+
+  for (auto iter = mCallbacks.Iter(); !iter.Done(); iter.Next()) {
+    nsCOMArray<nsICacheEntryOpenCallback>* callbackArray = iter.UserData();
+    callbackArray->RemoveObject(aCallback);
+  }
+
   return NS_OK;
 }
 
@@ -758,16 +782,20 @@ PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest()
   // Notify all requesters that a signed package is about to download and let
   // TabParent to decide if the request needs to be re-made in a new process.
   for (uint32_t i = 0; i < mRequesters.Length(); i++) {
-    nsCOMPtr<nsISupports> channel = mRequesters.ObjectAt(i);
-    nsCOMPtr<nsIPackagedAppChannelListener> listener = do_QueryInterface(channel);
+    nsCOMPtr<nsIPackagedAppChannelListener> listener = mRequesters.ObjectAt(i);
     if (listener) {
       LOG(("Notifying %p OnStartSignedPackageRequest. New origin: %s", listener.get(),
            mVerifier->GetPackageOrigin().get()));
       listener->OnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
     } else {
-      LOG(("%p is not a nsIPackagedAppChannelListener", channel.get()));
+      LOG(("%p is not a nsIPackagedAppChannelListener"));
     }
+
+    nsCOMPtr<nsICacheEntryOpenCallback> cacheCallback = do_QueryInterface(listener);
+    //RemoveCallbacks(cacheCallback);
   }
+
+  mRequesters.Clear();
 }
 
 void PackagedAppService::PackagedAppDownloader::InstallSignedPackagedApp()
@@ -876,6 +904,20 @@ PackagedAppService::GetPackageURI(nsIURI *aURI, nsIURI **aPackageURI)
 
   packageURI.forget(aPackageURI);
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PackagedAppService::Cancel(nsICacheEntryOpenCallback *aCallback,
+                           nsIPackagedAppChannelListener* aChannelListener)
+{
+  LOG(("Calling PackagedAppService::Cancel"));
+
+  for (auto iter = mDownloadingPackages.Iter(); !iter.Done(); iter.Next()) {
+    PackagedAppDownloader* downloader = iter.UserData();
+    downloader->RemoveRequester(aChannelListener);
+    downloader->RemoveCallbacks(aCallback);
+  }
   return NS_OK;
 }
 
@@ -998,8 +1040,8 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
   nsRefPtr<PackagedAppChannelListener> listener =
     new PackagedAppChannelListener(downloader, mimeConverter);
 
-  nsRefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
-  channel->SetNotificationCallbacks(loadContext);
+  //nsRefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
+  //channel->SetNotificationCallbacks(loadContext);
 
   return channel->AsyncOpen(listener, nullptr);
 }

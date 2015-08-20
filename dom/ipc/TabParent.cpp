@@ -106,6 +106,8 @@ using namespace mozilla::services;
 using namespace mozilla::widget;
 using namespace mozilla::jsipc;
 
+#define LOG(args) NS_WARNING args
+
 #ifdef MOZ_WIDGET_GONK
   #undef LOG
   #define LOG(args) printf_stderr args
@@ -450,7 +452,7 @@ TabParent::SwitchProcessAndLoadURI(nsIURI* aURI)
   }
 
   LOG(("Switch to new process and load URI"));
-  //frameLoader->SwitchProcessAndLoadURI(aURI);
+  frameLoader->SwitchProcessAndLoadURI(aURI);
 }
 
 void

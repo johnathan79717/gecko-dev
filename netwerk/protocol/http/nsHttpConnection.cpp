@@ -38,6 +38,8 @@
 extern PRThread *gSocketThread;
 #endif
 
+#define LOG
+
 namespace mozilla {
 namespace net {
 

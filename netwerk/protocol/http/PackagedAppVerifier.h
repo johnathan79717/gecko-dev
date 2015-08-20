@@ -11,6 +11,8 @@
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
 
+class nsITimer;
+
 namespace mozilla {
 namespace net {
 
@@ -21,7 +23,7 @@ class PackagedAppVerifier final
 public:
   enum EState {
     // The initial state.
-	STATE_UNKNOWN,
+	  STATE_UNKNOWN,
 
     // When we are notified to process the first resource, we will start to
     // verify the manifest and go to this state no matter the package has
@@ -95,6 +97,8 @@ private:
   void OnManifestVerified(bool aSuccess);
   void OnResourceVerified(bool aSuccess);
 
+  void FireFakeSuccessEvent(bool aForManifest);
+
   PackagedAppVerifierListener* mListener;
   mozilla::LinkedList<ResourceCacheInfo> mPendingResourceCacheInfoList;
 
@@ -103,6 +107,7 @@ private:
   nsCString mSignature;
   bool mIsPackageSigned;
 
+  nsCOMPtr<nsITimer> mTimer;
 }; // class PackagedAppVerifier
 
 class PackagedAppVerifierListener

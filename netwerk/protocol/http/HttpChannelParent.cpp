@@ -790,7 +790,19 @@ HttpChannelParent::ShouldSwitchProcess(const nsACString& aNewOrigin)
   LOG(("Loading origin: %s, package origin: %s", loadingOriginNoSuffix.get(),
                                                  nsCString(aNewOrigin).get()));
 
-  return !aNewOrigin.Equals(loadingOriginNoSuffix);
+  if (loadingOriginNoSuffix.Equals(aNewOrigin)) {
+    LOG(("Same origin. No need to switch process"));
+    return false;
+  }
+
+#if 0
+  if (StringBeginsWith(loadingOriginNoSuffix, NS_LITERAL_CSTRING("moz-safe-about:"))) {
+    LOG(("Load from moz-safe-about. No need to switch process"));
+    return false;
+  }
+#endif
+
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -807,7 +819,15 @@ HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aNewOrigin)
     mChannel->GetURI(getter_AddRefs(uri));
 
     mChannel->Cancel(NS_ERROR_UNKNOWN_HOST);
-    mTabParent->SwitchProcessAndLoadURI(uri);
+
+    // Call OnStartRequest and SendDivertMessages asynchronously to avoid
+    // reentering client context.
+    NS_DispatchToCurrentThread(
+      NS_NewRunnableMethodWithArgs<nsCOMPtr<nsIURI>>(mTabParent, 
+                                                     &TabParent::SwitchProcessAndLoadURI,
+                                                     uri));
+
+    //mTabParent->SwitchProcessAndLoadURI(uri);
   }
   return NS_OK;
 }

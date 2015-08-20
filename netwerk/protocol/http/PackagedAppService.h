@@ -118,6 +118,7 @@ private:
     // Registers a callback which gets called when the given nsIURI is downloaded
     // aURI is the full URI of a subresource, composed of packageURI + !// + subresourcePath
     nsresult AddCallback(nsIURI *aURI, nsICacheEntryOpenCallback *aCallback);
+    nsresult RemoveCallbacks(nsICacheEntryOpenCallback* aCallback);
 
     void AddRequester(nsIPackagedAppChannelListener* aRequester);
     bool RemoveRequester(nsIPackagedAppChannelListener* aRequester);

@@ -17,7 +17,7 @@ interface nsIPackagedAppChannelListener;
 /**
  * nsIPackagedAppService
  */
-[scriptable, builtinclass, uuid(94b01ed0-4036-11e5-b970-0800200c9a66)]
+[scriptable, builtinclass, uuid(753465b0-4659-11e5-b970-0800200c9a66)]
 interface nsIPackagedAppService : nsISupports
 {
   /**
@@ -49,4 +49,7 @@ interface nsIPackagedAppService : nsISupports
                    in nsILoadContextInfo aInfo,
                    in nsICacheEntryOpenCallback aCallback,
                    in nsIPackagedAppChannelListener aChannelListener);
+
+  void cancel(in nsICacheEntryOpenCallback aCallback,
+              in nsIPackagedAppChannelListener aChannelListener);
 };

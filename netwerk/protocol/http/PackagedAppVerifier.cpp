@@ -11,6 +11,7 @@
 #include "mozilla/DebugOnly.h"
 #include "nsThreadUtils.h"
 #include "PackagedAppVerifier.h"
+#include "nsITimer.h"
 
 // Defined in PackagedAppService.cpp
 extern PRLogModuleInfo *gPASLog;
@@ -80,6 +81,24 @@ PackagedAppVerifier::ProcessResourceCache(ResourceCacheInfo* aInfo)
 }
 
 void
+PackagedAppVerifier::FireFakeSuccessEvent(bool aForManifest)
+{
+  nsCOMPtr<nsIRunnable> r;
+
+  if (aForManifest) {
+    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this, 
+                                                    &PackagedAppVerifier::OnManifestVerified, 
+                                                    true);
+  } else {
+    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this, 
+                                                    &PackagedAppVerifier::OnResourceVerified, 
+                                                    true);
+  }
+    
+  NS_DispatchToMainThread(r);
+}
+
+void
 PackagedAppVerifier::VerifyManifest(ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Manifest verification must be on main thread");
@@ -88,10 +107,20 @@ PackagedAppVerifier::VerifyManifest(ResourceCacheInfo* aInfo)
 
   mState = STATE_MANIFEST_VERIFYING;
 
-  // FIXME: Fire a fake successful OnManifestVerified event.
-  nsCOMPtr<nsIRunnable> r =
-    NS_NewNonOwningRunnableMethodWithArgs<bool>(this, &PackagedAppVerifier::OnManifestVerified, true);
-  NS_DispatchToMainThread(r);
+  FireFakeSuccessEvent(true);
+
+#if 0
+  mTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
+  
+  nsTimerCallbackFunc cb = [](nsITimer* aTimer, void* aClosure) {
+    LOG(("Fake VerifyManifest timer called back. Fire event for OnManifestVerified now."));
+    auto self = static_cast<PackagedAppVerifier*>(aClosure);
+    // FIXME: Fire a fake successful OnManifestVerified event.
+    self->FireFakeSuccessEvent(true);
+  };
+
+  mTimer->InitWithFuncCallback(cb, this, 5000, nsITimer::TYPE_ONE_SHOT);
+#endif
 
   // TODO: Delegate to the actual verifier.
 }
@@ -104,9 +133,7 @@ PackagedAppVerifier::VerifyResource(ResourceCacheInfo* aInfo)
   LOG(("PackagedAppVerifier::VerifyResource: %s", UriToString(aInfo->mURI).get()));
 
   // FIXME: Fire a fake successful OnResourceVerified event.
-  nsCOMPtr<nsIRunnable> r =
-    NS_NewNonOwningRunnableMethodWithArgs<bool>(this, &PackagedAppVerifier::OnResourceVerified, true);
-  NS_DispatchToMainThread(r);
+  FireFakeSuccessEvent(false);
 
   // TODO: Delegate to the actual verifier.
 }

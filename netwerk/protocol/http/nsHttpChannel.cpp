@@ -4883,6 +4883,12 @@ nsHttpChannel::Cancel(nsresult status)
         mCachePump->Cancel(status);
     if (mAuthProvider)
         mAuthProvider->Cancel(status);
+    if (mIsPackagedAppResource) {
+        nsresult rv;
+        nsCOMPtr<nsIPackagedAppService> pas =
+            do_GetService("@mozilla.org/network/packaged-app-service;1", &rv);
+        rv = pas->Cancel(this, this);
+    }
     return NS_OK;
 }
 
@@ -6009,8 +6015,8 @@ nsHttpChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
     PROFILER_LABEL("nsHttpChannel", "OnDataAvailable",
         js::ProfileEntry::Category::NETWORK);
 
-    LOG(("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%llu count=%u]\n",
-        this, request, offset, count));
+//    LOG(("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%llu count=%u]\n",
+//        this, request, offset, count));
 
     // don't send out OnDataAvailable notifications if we've been canceled.
     if (mCanceled)
