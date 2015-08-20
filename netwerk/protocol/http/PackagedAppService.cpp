@@ -788,7 +788,7 @@ PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest()
            mVerifier->GetPackageOrigin().get()));
       listener->OnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
     } else {
-      LOG(("%p is not a nsIPackagedAppChannelListener"));
+      LOG(("%p is not a nsIPackagedAppChannelListener", listener.get()));
     }
 
     nsCOMPtr<nsICacheEntryOpenCallback> cacheCallback = do_QueryInterface(listener);
@@ -946,7 +946,7 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
     nsCString loadingOrigin;
     loadingPrincipal->GetOrigin(loadingOrigin);
 
-    LOG(("PackagedAppService::GetResource  >  Loading origin: %s", loadingOrigin.get()));
+    LOG(("PackagedAppService::GetResource  >  Loading origin: %s.", loadingOrigin.get()));
   }
   /////////////////////////////////////////////////////////////
 
@@ -986,7 +986,7 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
     // If we find that the package that the file belongs to is currently being
     // downloaded, we will add the callback to the package's queue, and it will
     // be called once the file is processed and saved in the cache.
-
+    LOG(("Just add callback to the ongoing downloader"));
     downloader->AddRequester(aChannelListener);
     downloader->AddCallback(uri, aCallback);
     return NS_OK;
@@ -1040,8 +1040,10 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
   nsRefPtr<PackagedAppChannelListener> listener =
     new PackagedAppChannelListener(downloader, mimeConverter);
 
-  //nsRefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
-  //channel->SetNotificationCallbacks(loadContext);
+  nsRefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
+  channel->SetNotificationCallbacks(loadContext);
+
+  LOG(("Open internal channel to download the package: %s", key.get()));
 
   return channel->AsyncOpen(listener, nullptr);
 }

@@ -795,12 +795,18 @@ HttpChannelParent::ShouldSwitchProcess(const nsACString& aNewOrigin)
     return false;
   }
 
-#if 0
-  if (StringBeginsWith(loadingOriginNoSuffix, NS_LITERAL_CSTRING("moz-safe-about:"))) {
-    LOG(("Load from moz-safe-about. No need to switch process"));
-    return false;
+  const char* kWhiteOriginList[] = {
+    "app://search.gaiamobile.org",
+    "app://verticalhome.gaiamobile.org",
+    "moz-safe-about:",
+  };
+
+  for (uint32_t i = 0; i < mozilla::ArrayLength(kWhiteOriginList); i++) {
+    if (StringBeginsWith(loadingOriginNoSuffix, nsCString(kWhiteOriginList[i]))) {
+      LOG(("Loading from white origin list: %s", kWhiteOriginList[i]));
+      return false;
+    }
   }
-#endif
 
   return true;
 }

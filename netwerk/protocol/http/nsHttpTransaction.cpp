@@ -51,9 +51,6 @@ extern PRThread *gSocketThread;
 
 //-----------------------------------------------------------------------------
 
-
-#define LOG
-
 static NS_DEFINE_CID(kMultiplexInputStream, NS_MULTIPLEXINPUTSTREAM_CID);
 
 // Place a limit on how much non-compliant HTTP can be skipped while
