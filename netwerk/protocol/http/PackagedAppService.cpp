@@ -817,9 +817,6 @@ PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest(con
     } else {
       LOG(("%p is not a nsIPackagedAppChannelListener", listener.get()));
     }
-
-    nsCOMPtr<nsICacheEntryOpenCallback> cacheCallback = do_QueryInterface(listener);
-    //RemoveCallbacks(cacheCallback);
   }
 
   mRequesters.Clear();
@@ -931,20 +928,6 @@ PackagedAppService::GetPackageURI(nsIURI *aURI, nsIURI **aPackageURI)
 
   packageURI.forget(aPackageURI);
 
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PackagedAppService::Cancel(nsICacheEntryOpenCallback *aCallback,
-                           nsIPackagedAppChannelListener* aChannelListener)
-{
-  LOG(("Calling PackagedAppService::Cancel"));
-
-  for (auto iter = mDownloadingPackages.Iter(); !iter.Done(); iter.Next()) {
-    PackagedAppDownloader* downloader = iter.UserData();
-    downloader->RemoveRequester(aChannelListener);
-    downloader->RemoveCallbacks(aCallback);
-  }
   return NS_OK;
 }
 

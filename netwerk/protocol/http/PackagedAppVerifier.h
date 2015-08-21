@@ -10,9 +10,9 @@
 #include "mozilla/LinkedList.h"
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
+#include "nsIPackagedAppCacheInfoChannel.h"
 
 class nsITimer;
-class nsIPackagedAppCacheInfoChannel;
 
 namespace mozilla {
 namespace net {

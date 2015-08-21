@@ -817,23 +817,17 @@ HttpChannelParent::ShouldSwitchProcess(const nsACString& aNewOrigin)
 NS_IMETHODIMP
 HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aNewOrigin)
 {
+  // TODO: Move this check out of necko. (maybe to TabParent)
   LOG(("HttpChannelParent::OnStartSignedPackageRequest"));
   if (ShouldSwitchProcess(aNewOrigin)) {
     LOG(("We decide to switch process. Call TabParent::SwitchProcessAndLoadURIs"));
-
     nsCOMPtr<nsIURI> uri;
     mChannel->GetURI(getter_AddRefs(uri));
 
-    mChannel->Cancel(NS_ERROR_UNKNOWN_HOST);
-
-    // Call OnStartRequest and SendDivertMessages asynchronously to avoid
-    // reentering client context.
-    NS_DispatchToCurrentThread(
-      NS_NewRunnableMethodWithArgs<nsCOMPtr<nsIURI>>(mTabParent, 
-                                                     &TabParent::SwitchProcessAndLoadURI,
-                                                     uri));
-
-    //mTabParent->SwitchProcessAndLoadURI(uri);
+    // TODO: Use a proper error code.
+    mChannel->AsyncAbort(NS_ERROR_UNKNOWN_HOST);
+    
+    mTabParent->SwitchProcessAndLoadURI(uri);
   }
   return NS_OK;
 }

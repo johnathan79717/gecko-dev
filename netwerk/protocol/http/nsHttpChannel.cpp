@@ -4884,12 +4884,6 @@ nsHttpChannel::Cancel(nsresult status)
         mCachePump->Cancel(status);
     if (mAuthProvider)
         mAuthProvider->Cancel(status);
-    if (mIsPackagedAppResource) {
-        nsresult rv;
-        nsCOMPtr<nsIPackagedAppService> pas =
-            do_GetService("@mozilla.org/network/packaged-app-service;1", &rv);
-        rv = pas->Cancel(this, this);
-    }
     return NS_OK;
 }
 
