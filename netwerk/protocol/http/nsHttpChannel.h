@@ -25,6 +25,7 @@
 #include "AutoClose.h"
 #include "nsIStreamListener.h"
 #include "nsISupportsPrimitives.h"
+#include "nsIPackagedAppCacheInfoChannel.h"
 
 class nsDNSPrefetch;
 class nsICancelable;
@@ -71,6 +72,7 @@ class nsHttpChannel final : public HttpBaseChannel
                           , public nsIThreadRetargetableStreamListener
                           , public nsIDNSListener
                           , public nsSupportsWeakReference
+                          , public nsIPackagedAppCacheInfoChannel
 {
 public:
     NS_DECL_ISUPPORTS_INHERITED
@@ -89,6 +91,7 @@ public:
     NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
     NS_DECL_NSITHREADRETARGETABLEREQUEST
     NS_DECL_NSIDNSLISTENER
+    NS_DECL_NSIPACKAGEDAPPCACHEINFOCHANNEL
     NS_DECLARE_STATIC_IID_ACCESSOR(NS_HTTPCHANNEL_IID)
 
     // nsIHttpAuthenticableChannel. We can't use

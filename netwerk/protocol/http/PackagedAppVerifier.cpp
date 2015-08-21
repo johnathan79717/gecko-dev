@@ -37,12 +37,14 @@ namespace net {
 
 PackagedAppVerifier::PackagedAppVerifier(PackagedAppVerifierListener* aListener,
                                          const nsACString& aPackageOrigin,
-                                         const nsACString& aSignature)
+                                         const nsACString& aSignature,
+                                         nsIPackagedAppCacheInfoChannel* aCacheInfoChannel)
   : mListener(aListener)
   , mState(STATE_UNKNOWN)
   , mPackageOrigin(aPackageOrigin)
   , mSignature(aSignature)
   , mIsPackageSigned(false)
+  , mCacheInfoChannel(aCacheInfoChannel)
 {
 }
 
@@ -151,6 +153,14 @@ PackagedAppVerifier::OnManifestVerified(bool aSuccess)
                     : STATE_MANIFEST_VERIFIED_FAILED;
 
   // TODO: Update mPackageOrigin.
+
+  // If the package is signed, add related info to the package cache.
+  if (mIsPackageSigned && mCacheInfoChannel) {
+    LOG(("This package is signed. Add this info to the cache channel."));
+    mCacheInfoChannel->SetIsSignedPackage(true);
+    mCacheInfoChannel->SetSignedPackageOrigin(mPackageOrigin);
+    mCacheInfoChannel = nullptr; // the cache channel is no longer needed.
+  }
 
   ResourceCacheInfo* info = mPendingResourceCacheInfoList.popFirst();
   MOZ_ASSERT(info);

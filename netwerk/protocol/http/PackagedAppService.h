@@ -128,6 +128,8 @@ private:
     // package metadata is saved in the cache.
     void SetIsFromCache(bool aFromCache) { mIsFromCache = aFromCache; }
 
+    void NotifyOnStartSignedPackageRequest(const nsACString& PackageOrigin);
+
   private:
     ~PackagedAppDownloader() { }
 
@@ -140,8 +142,7 @@ private:
     void OnError(EErrorType aError);
     void FinalizeDownload(nsresult aStatusCode);
     nsCString GetSignatureFromChannel(nsIMultiPartChannel* aChannel);
-    void NotifyOnStartSignedPackageRequest();
-
+    
     // Handle all tasks about app installation like permission and system message
     // registration.
     void InstallSignedPackagedApp();

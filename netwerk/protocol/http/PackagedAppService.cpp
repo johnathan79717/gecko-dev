@@ -17,6 +17,7 @@
 #include "mozilla/DebugOnly.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "mozilla/LoadContext.h"
+#include "nsIPackagedAppCacheInfoChannel.h"
 
 #define TESTING_SIGNATURE "Testing signature"
 
@@ -320,8 +321,22 @@ PackagedAppService::PackagedAppChannelListener::OnStartRequest(nsIRequest *aRequ
   mDownloader->SetIsFromCache(isFromCache);
   LOG(("[%p] Downloader isFromCache: %d\n", mDownloader.get(), isFromCache));
 
-  nsCOMPtr<nsIChannel> channel = do_QueryInterface(aRequest);
-
+  // If the package is loaded from cache, we can check 'isSigned' right now and
+  // notify all requesters immediately.
+  if (isFromCache) {
+    bool isPackageSigned = false;
+    nsCString signedPackageOrigin;
+    nsCOMPtr<nsIPackagedAppCacheInfoChannel> pakCacheChan = do_QueryInterface(aRequest);
+    if (pakCacheChan) {
+      pakCacheChan->GetIsSignedPackage(&isPackageSigned);
+      pakCacheChan->GetSignedPackageOrigin(signedPackageOrigin);
+    }
+    if (isPackageSigned) {
+      LOG(("The cached package is signed. Notify the requesters."));
+      mDownloader->NotifyOnStartSignedPackageRequest(signedPackageOrigin);
+    }  
+  }
+  
   // XXX: This is the place to suspend the channel, doom existing cache entries
   // for previous resources, and then resume the channel.
   return mListener->OnStartRequest(aRequest, aContext);
@@ -477,7 +492,7 @@ void
 PackagedAppService::PackagedAppDownloader::FinalizeDownload(nsresult aStatusCode)
 {
   if (mIsFromCache && mVerifier->IsPackageSigned()) {
-    NotifyOnStartSignedPackageRequest();
+    NotifyOnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
     // If process switch is required, hope it wouldn't be too late to be cancelled.
     // We are about to serve data in |ClearCallbacks|.
   }
@@ -539,7 +554,19 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
 
   if (!mVerifier) {
     nsCString signature = GetSignatureFromChannel(multiChannel);
-    mVerifier = new PackagedAppVerifier(this, mPackageOrigin, signature);
+
+    // Get the packaged app cache info channel from the base channel.
+    nsCOMPtr<nsIPackagedAppCacheInfoChannel> cacheInfoChannel;
+    if (multiChannel) {
+      nsCOMPtr<nsIChannel> baseChannel;
+      multiChannel->GetBaseChannel(getter_AddRefs(baseChannel));
+      cacheInfoChannel = do_QueryInterface(baseChannel);
+    }
+
+    mVerifier = new PackagedAppVerifier(this, 
+                                        mPackageOrigin, 
+                                        signature, 
+                                        cacheInfoChannel);
   }
 
   LOG(("[%p] PackagedAppDownloader::OnStopRequest > status:%X multiChannel:%p\n",
@@ -776,7 +803,7 @@ PackagedAppService::PackagedAppDownloader::ClearCallbacks(nsresult aResult)
 }
 
 void
-PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest()
+PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest(const nsACString& aPackageOrigin)
 {
   LOG(("Ready to notify OnStartSignedPackageRequest to all requesters."));
   // Notify all requesters that a signed package is about to download and let
@@ -785,8 +812,8 @@ PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest()
     nsCOMPtr<nsIPackagedAppChannelListener> listener = mRequesters.ObjectAt(i);
     if (listener) {
       LOG(("Notifying %p OnStartSignedPackageRequest. New origin: %s", listener.get(),
-           mVerifier->GetPackageOrigin().get()));
-      listener->OnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
+           nsCString(aPackageOrigin).get()));
+      listener->OnStartSignedPackageRequest(aPackageOrigin);
     } else {
       LOG(("%p is not a nsIPackagedAppChannelListener", listener.get()));
     }
@@ -830,7 +857,7 @@ PackagedAppService::PackagedAppDownloader::OnManifestVerified(ResourceCacheInfo*
     return;
   }
 
-  NotifyOnStartSignedPackageRequest();
+  NotifyOnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
   InstallSignedPackagedApp();
 }
 

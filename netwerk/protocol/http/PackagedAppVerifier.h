@@ -12,6 +12,7 @@
 #include "nsIURI.h"
 
 class nsITimer;
+class nsIPackagedAppCacheInfoChannel;
 
 namespace mozilla {
 namespace net {
@@ -64,7 +65,8 @@ public:
 public:
   PackagedAppVerifier(PackagedAppVerifierListener* aListener,
                       const nsACString& aPackageOrigin,
-                      const nsACString& aSignature);
+                      const nsACString& aSignature,
+                      nsIPackagedAppCacheInfoChannel* aCacheInfoChannel);
 
   ~PackagedAppVerifier() { }
 
@@ -108,6 +110,7 @@ private:
   bool mIsPackageSigned;
 
   nsCOMPtr<nsITimer> mTimer;
+  nsCOMPtr<nsIPackagedAppCacheInfoChannel> mCacheInfoChannel;
 }; // class PackagedAppVerifier
 
 class PackagedAppVerifierListener
