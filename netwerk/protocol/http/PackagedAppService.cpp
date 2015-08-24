@@ -19,23 +19,14 @@
 #include "mozilla/LoadContext.h"
 #include "nsIPackagedAppCacheInfoChannel.h"
 
-#define TESTING_SIGNATURE "Testing signature"
-
-#define FORCE_TO_USE_TESTING_SIGNATURE true
-
 namespace mozilla {
 namespace net {
 
 static PackagedAppService *gPackagedAppService = nullptr;
 
-PRLogModuleInfo *gPASLog = nullptr;
+static PRLogModuleInfo *gPASLog = nullptr;
 #undef LOG
 #define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
-
-#ifdef MOZ_WIDGET_GONK
-  #undef LOG
-  #define LOG(args) printf_stderr args
-#endif
 
 NS_IMPL_ISUPPORTS(PackagedAppService, nsIPackagedAppService)
 
@@ -44,7 +35,7 @@ NS_IMPL_ISUPPORTS(PackagedAppService::CacheEntryWriter, nsIStreamListener)
 static void
 LogURI(const char *aFunctionName, void *self, nsIURI *aURI, nsILoadContextInfo *aInfo = nullptr)
 {
-  //if (MOZ_LOG_TEST(gPASLog, LogLevel::Debug)) {
+  if (MOZ_LOG_TEST(gPASLog, LogLevel::Debug)) {
     nsAutoCString spec;
     if (aURI) {
       aURI->GetAsciiSpec(spec);
@@ -59,18 +50,7 @@ LogURI(const char *aFunctionName, void *self, nsIURI *aURI, nsILoadContextInfo *
     }
 
     LOG(("[%p] %s > %s%s\n", self, aFunctionName, prefix.get(), spec.get()));
-  //}
-}
-
-namespace {
-
-nsCString UriToString(nsIURI* aURI)
-{
-  nsCString s;
-  aURI->GetAsciiSpec(s);
-  return s;
-}
-
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -530,6 +510,7 @@ PackagedAppService::PackagedAppDownloader::GetSubresourceURI(nsIRequest * aReque
 void
 PackagedAppService::PackagedAppDownloader::OnError(EErrorType aError)
 {
+  // TODO: Handler verification error properly.
   LOG(("PackagedAppDownloader::OnError > %d", aError));
 }
 
@@ -569,18 +550,7 @@ PackagedAppService::PackagedAppDownloader::GetSignatureFromChannel(nsIMultiPartC
   nsCString packageHeader;
   aMulitChannel->GetPreamble(packageHeader);
 
-  nsCString signature;
-
-  // Parse signature from the header.
-  if (!packageHeader.IsEmpty()) {
-    // TODO: Parse signature from the package header.
-  }
-
-#if FORCE_TO_USE_TESTING_SIGNATURE
-  signature = TESTING_SIGNATURE;
-#endif
-
-  return signature;
+  return packageHeader;
 }
 
 NS_IMETHODIMP
@@ -639,8 +609,6 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
   // Try to avoid this bad practice when the use of ResourceCacheInfo is
   // getting complicated.
   ResourceCacheInfo* info = new ResourceCacheInfo(uri, entry, aStatusCode, lastPart);
-
-  LOG(("ResourceCacheInfo created for %s", UriToString(uri).get()));
 
   // The downloader only needs to focus on PackagedAppVerifierListener callbacks.
   // The PackagedAppVerifier would handle the manifest/resource verification.
@@ -854,9 +822,6 @@ void
 PackagedAppService::PackagedAppDownloader::OnManifestVerified(ResourceCacheInfo* aInfo,
                                                               bool aSuccess)
 {
-  LOG(("PackagedAppDownloader::OnManifestVerified: %s, %d",
-        UriToString(aInfo->mURI).get(), aSuccess));
-
   nsAutoPtr<ResourceCacheInfo> autoInfo(aInfo);
 
   if (!aSuccess) {
@@ -881,9 +846,6 @@ void
 PackagedAppService::PackagedAppDownloader::OnResourceVerified(ResourceCacheInfo* aInfo,
                                                               bool aSuccess)
 {
-  LOG(("PackagedAppDownloader::OnResourceVerified: %s, %d",
-        UriToString(aInfo->mURI).get(), aSuccess));
-
   nsAutoPtr<ResourceCacheInfo> autoInfo(aInfo);
 
   if (!aSuccess) {
@@ -961,23 +923,6 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
     return NS_ERROR_INVALID_ARG;
   }
 
-  /////////////////////////////////////////////////////////////
-  {
-    nsCOMPtr<nsIChannel> channel = do_QueryInterface(aCallback);
-
-    nsCOMPtr<nsILoadInfo> loadInfo;
-    channel->GetLoadInfo(getter_AddRefs(loadInfo));
-
-    nsCOMPtr<nsIPrincipal> loadingPrincipal;
-    loadInfo->GetLoadingPrincipal(getter_AddRefs(loadingPrincipal));
-
-    nsCString loadingOrigin;
-    loadingPrincipal->GetOrigin(loadingOrigin);
-
-    LOG(("PackagedAppService::GetResource  >  Loading origin: %s.", loadingOrigin.get()));
-  }
-  /////////////////////////////////////////////////////////////
-
   nsresult rv;
 
   nsCOMPtr<nsIURI> uri;
@@ -1006,15 +951,13 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
     key += spec;
   }
 
-  LOG(("PackagedAppDownloader key: %s", key.get()));
-
   nsRefPtr<PackagedAppDownloader> downloader;
   if (mDownloadingPackages.Get(key, getter_AddRefs(downloader))) {
     // We have determined that the file is not in the cache.
     // If we find that the package that the file belongs to is currently being
     // downloaded, we will add the callback to the package's queue, and it will
     // be called once the file is processed and saved in the cache.
-    LOG(("Just add callback to the ongoing downloader"));
+
     downloader->AddCallback(uri, aCallback);
     return NS_OK;
   }
@@ -1065,11 +1008,6 @@ PackagedAppService::GetResource(nsIPrincipal *aPrincipal,
 
   nsRefPtr<PackagedAppChannelListener> listener =
     new PackagedAppChannelListener(downloader, mimeConverter);
-
-  nsRefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
-  channel->SetNotificationCallbacks(loadContext);
-
-  LOG(("Open internal channel to download the package: %s", key.get()));
 
   return channel->AsyncOpen(listener, nullptr);
 }

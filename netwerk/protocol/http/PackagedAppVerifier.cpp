@@ -14,23 +14,6 @@
 #include "nsITimer.h"
 #include "nsICryptoHash.h"
 
-// Defined in PackagedAppService.cpp
-extern PRLogModuleInfo *gPASLog;
-
-#undef LOG
-#define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
-
-#ifdef MOZ_WIDGET_GONK
-  #undef LOG
-  #define LOG(args) printf_stderr args
-#endif
-
-namespace {
-
-nsCString UriToString(nsIURI* aURI);
-
-}
-
 const short kResourceHashType = nsICryptoHash::SHA256;
 
 namespace mozilla {
@@ -88,8 +71,6 @@ PackagedAppVerifier::ProcessResourceCache(ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "OnResourceCached must be on main thread");
 
-  LOG(("PackagedAppVerifier::ProcessResourceCache: %s. State: %d", UriToString(aInfo->mURI).get(), mState));
-
   QueueResource(aInfo);
 
   switch (mState) {
@@ -140,8 +121,6 @@ PackagedAppVerifier::VerifyManifest(ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Manifest verification must be on main thread");
 
-  LOG(("PackagedAppVerifier::VerifyManifest: %s", UriToString(aInfo->mURI).get()));
-
   mState = STATE_MANIFEST_VERIFYING;
 
   FireFakeSuccessEvent(true);
@@ -166,8 +145,6 @@ void
 PackagedAppVerifier::VerifyResource(ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Resource resource must be on main thread");
-
-  LOG(("PackagedAppVerifier::VerifyResource: %s", UriToString(aInfo->mURI).get()));
 
   nsAutoCString uriAsAscii;
   aInfo->mURI->GetAsciiSpec(uriAsAscii);
@@ -230,9 +207,6 @@ PackagedAppVerifier::OnResourceVerified(bool aSuccess)
   ResourceCacheInfo* info = mPendingResourceCacheInfoList.popFirst();
   MOZ_ASSERT(info);
 
-  LOG(("PackagedAppVerifier::OnResourceVerified: %s has been verified: %d",
-       UriToString(info->mURI).get(), aSuccess));
-
   // Must be called on main thread.
   mListener->OnResourceVerified(info, aSuccess);
 }
@@ -240,7 +214,6 @@ PackagedAppVerifier::OnResourceVerified(bool aSuccess)
 void
 PackagedAppVerifier::QueueResource(ResourceCacheInfo* aInfo)
 {
-  LOG(("PackagedAppVerifier::QueueResource: %s", UriToString(aInfo->mURI).get()));
   mPendingResourceCacheInfoList.insertBack(aInfo);
 }
 
