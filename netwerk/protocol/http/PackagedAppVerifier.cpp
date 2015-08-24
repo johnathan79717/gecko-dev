@@ -12,6 +12,7 @@
 #include "nsThreadUtils.h"
 #include "PackagedAppVerifier.h"
 #include "nsITimer.h"
+#include "nsICryptoHash.h"
 
 // Defined in PackagedAppService.cpp
 extern PRLogModuleInfo *gPASLog;
@@ -30,6 +31,8 @@ nsCString UriToString(nsIURI* aURI);
 
 }
 
+const short kResourceHashType = nsICryptoHash::SHA256;
+
 namespace mozilla {
 namespace net {
 
@@ -46,6 +49,38 @@ PackagedAppVerifier::PackagedAppVerifier(PackagedAppVerifierListener* aListener,
   , mIsPackageSigned(false)
   , mCacheInfoChannel(aCacheInfoChannel)
 {
+  nsresult rv;
+  mHasher = do_CreateInstance("@mozilla.org/security/hash;1", &rv);
+}
+
+nsresult
+PackagedAppVerifier::BeginResourceHash(const nsACString& aResourceURI)
+{
+  mHashingResourceURI = aResourceURI;
+  return mHasher->Init(kResourceHashType);
+}
+
+nsresult
+PackagedAppVerifier::UpdateResourceHash(const uint8_t* aData, uint32_t aLen)
+{
+  MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
+  return mHasher->Update(aData, aLen);
+}
+
+nsresult
+PackagedAppVerifier::EndResourceHash()
+{
+  MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
+  nsAutoCString hash;
+  nsresult rv = mHasher->Finish(true, hash);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  LOG(("Hash of %s is %s", mHashingResourceURI.get(), hash.get()));
+
+  // Store the hash for the resource.
+  mResourceHashHash.Put(mHashingResourceURI, new nsCString(hash));
+  mHashingResourceURI = "";
+  return NS_OK;
 }
 
 void
@@ -124,7 +159,7 @@ PackagedAppVerifier::VerifyManifest(ResourceCacheInfo* aInfo)
   mTimer->InitWithFuncCallback(cb, this, 5000, nsITimer::TYPE_ONE_SHOT);
 #endif
 
-  // TODO: Delegate to the actual verifier.
+  // TODO: Call the manifest verification function implemented in Bug 1178518.
 }
 
 void
@@ -134,10 +169,20 @@ PackagedAppVerifier::VerifyResource(ResourceCacheInfo* aInfo)
 
   LOG(("PackagedAppVerifier::VerifyResource: %s", UriToString(aInfo->mURI).get()));
 
+  nsAutoCString uriAsAscii;
+  aInfo->mURI->GetAsciiSpec(uriAsAscii);
+  nsCString* resourceHash = mResourceHashHash.Get(uriAsAscii);
+     
+  if (!resourceHash) {
+    LOG(("Hash value for %s is not computed. ERROR!", uriAsAscii.get()));
+    MOZ_CRASH();
+  }
+
+  LOG(("Checking the resource integrity. '%s'", resourceHash->get()));
+  // TODO: Call the integrity check function implemented in Bug 1178518.
+
   // FIXME: Fire a fake successful OnResourceVerified event.
   FireFakeSuccessEvent(false);
-
-  // TODO: Delegate to the actual verifier.
 }
 
 void

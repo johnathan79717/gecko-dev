@@ -11,6 +11,9 @@
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
 #include "nsIPackagedAppCacheInfoChannel.h"
+#include "nsClassHashtable.h"
+#include "nsHashKeys.h"
+#include "nsICryptoHash.h"
 
 class nsITimer;
 
@@ -70,6 +73,10 @@ public:
 
   ~PackagedAppVerifier() { }
 
+  nsresult BeginResourceHash(const nsACString& aResourceURI);
+  nsresult UpdateResourceHash(const uint8_t* aData, uint32_t aLen);
+  nsresult EndResourceHash();
+
   // Called when a resource is already fully written in the cache. This resource
   // will be processed and is guaranteed to be called back in either:
   //
@@ -111,6 +118,11 @@ private:
 
   nsCOMPtr<nsITimer> mTimer;
   nsCOMPtr<nsIPackagedAppCacheInfoChannel> mCacheInfoChannel;
+
+  // For resource hash computation.
+  nsCString mHashingResourceURI;
+  nsCOMPtr<nsICryptoHash> mHasher;
+  nsClassHashtable<nsCStringHashKey, nsCString> mResourceHashHash;
 }; // class PackagedAppVerifier
 
 class PackagedAppVerifierListener

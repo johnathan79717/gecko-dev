@@ -324,7 +324,7 @@ PackagedAppService::PackagedAppChannelListener::OnStartRequest(nsIRequest *aRequ
     }
     if (isPackageSigned) {
       LOG(("The cached package is signed. Notify the requesters."));
-      // TODO: Bug 1186290 to notify the signed package is about to load.
+      mDownloader->NotifyOnStartSignedPackageRequest(signedPackageOrigin);
     }  
   }
   
@@ -380,6 +380,56 @@ PackagedAppService::PackagedAppDownloader::Init(nsILoadContextInfo* aInfo,
   return NS_OK;
 }
 
+nsresult 
+PackagedAppService::PackagedAppDownloader::BeginHashComputation(nsIURI* aURI,
+                                                                nsIRequest* aRequest)
+{
+  nsCOMPtr<nsIResponseHeadProvider> headerProvider(do_QueryInterface(aRequest));
+  nsHttpResponseHead *responseHead = headerProvider->GetResponseHead();
+  if (!responseHead) {
+    LOG(("Failed to get header from the request."));
+    return NS_ERROR_FAILURE;
+  }
+
+  // Start over a new hash computation.
+  nsAutoCString uriAsAscii;
+  aURI->GetAsciiSpec(uriAsAscii);
+  mVerifier->BeginResourceHash(uriAsAscii);
+
+  // Feed the flattened and original header to the hasher.
+  nsAutoCString head;
+  responseHead->Flatten(head, true); 
+  head.Append("\n");
+  
+  return mVerifier->UpdateResourceHash((const uint8_t*)head.get(), head.Length());
+}
+
+void 
+PackagedAppService::PackagedAppDownloader::EnsureVerifier(nsIRequest *aRequest)
+{
+  if (mVerifier) {
+    return;
+  }
+
+  LOG(("Creating PackagedAppVerifier."));
+
+  nsCOMPtr<nsIMultiPartChannel> multiChannel(do_QueryInterface(aRequest));
+  nsCString signature = GetSignatureFromChannel(multiChannel);
+
+  // Get the packaged app cache info channel from the base channel.
+  nsCOMPtr<nsIPackagedAppCacheInfoChannel> cacheInfoChannel;
+  if (multiChannel) {
+    nsCOMPtr<nsIChannel> baseChannel;
+    multiChannel->GetBaseChannel(getter_AddRefs(baseChannel));
+    cacheInfoChannel = do_QueryInterface(baseChannel);
+  }
+
+  mVerifier = new PackagedAppVerifier(this, 
+                                      mPackageOrigin, 
+                                      signature, 
+                                      cacheInfoChannel);
+}
+
 NS_IMETHODIMP
 PackagedAppService::PackagedAppDownloader::OnStartRequest(nsIRequest *aRequest,
                                                           nsISupports *aContext)
@@ -405,6 +455,10 @@ PackagedAppService::PackagedAppDownloader::OnStartRequest(nsIRequest *aRequest,
   MOZ_ASSERT(mWriter);
   rv = mWriter->OnStartRequest(aRequest, aContext);
   NS_WARN_IF(NS_FAILED(rv));
+
+  EnsureVerifier(aRequest);
+  BeginHashComputation(uri, aRequest);
+
   return NS_OK;
 }
 
@@ -482,12 +536,6 @@ PackagedAppService::PackagedAppDownloader::OnError(EErrorType aError)
 void
 PackagedAppService::PackagedAppDownloader::FinalizeDownload(nsresult aStatusCode)
 {
-  if (mIsFromCache && mVerifier->IsPackageSigned()) {
-    NotifyOnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
-    // If process switch is required, hope it wouldn't be too late to be cancelled.
-    // We are about to serve data in |ClearCallbacks|.
-  }
-
   // If this is the last part of the package, it means the requested resources
   // have not been found in the package so we return an appropriate error.
   // If the package response comes from the cache, we want to preserve the
@@ -543,23 +591,6 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
   nsCOMPtr<nsIMultiPartChannel> multiChannel(do_QueryInterface(aRequest));
   nsresult rv;
 
-  if (!mVerifier) {
-    nsCString signature = GetSignatureFromChannel(multiChannel);
-
-    // Get the packaged app cache info channel from the base channel.
-    nsCOMPtr<nsIPackagedAppCacheInfoChannel> cacheInfoChannel;
-    if (multiChannel) {
-      nsCOMPtr<nsIChannel> baseChannel;
-      multiChannel->GetBaseChannel(getter_AddRefs(baseChannel));
-      cacheInfoChannel = do_QueryInterface(baseChannel);
-    }
-
-    mVerifier = new PackagedAppVerifier(this, 
-                                        mPackageOrigin, 
-                                        signature, 
-                                        cacheInfoChannel);
-  }
-
   LOG(("[%p] PackagedAppDownloader::OnStopRequest > status:%X multiChannel:%p\n",
        this, aStatusCode, multiChannel.get()));
 
@@ -589,6 +620,7 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
   // We've got a resource downloaded. Finalize this resource cache and delegate to
   // PackagedAppVerifier rather than serving this resource right away.
 
+  mVerifier->EndResourceHash();
   mWriter->OnStopRequest(aRequest, aContext, aStatusCode);
 
   nsCOMPtr<nsIURI> uri;
@@ -637,6 +669,8 @@ PackagedAppService::PackagedAppDownloader::ConsumeData(nsIInputStream *aStream,
     *aWriteCount = aCount;
     return NS_OK;
   }
+
+  self->mVerifier->UpdateResourceHash((const uint8_t*)aFromRawSegment, aCount);
 
   return self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
 }
@@ -803,12 +837,14 @@ PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest(con
 {
   // TODO: Bug 1186290 to notify whoever wants to know the signed package is
   //       ready to load.
+  LOG(("Notifying the signed package is ready to load."));
 }
 
 void PackagedAppService::PackagedAppDownloader::InstallSignedPackagedApp()
 {
   // TODO: Bug 1178533 to register permissions, system messages etc on navigation to 
   //       signed packages.
+  LOG(("Install this packaged app."));
 }
 
 //------------------------------------------------------------------

@@ -150,6 +150,12 @@ private:
     void OnError(EErrorType aError);
     void FinalizeDownload(nsresult aStatusCode);
     nsCString GetSignatureFromChannel(nsIMultiPartChannel* aChannel);
+
+    // Start off a resource hash computation and feed the HTTP response header.
+    nsresult BeginHashComputation(nsIURI* aURI, nsIRequest* aRequest);
+
+    // Ensure a packaged app verifier is created.
+    void EnsureVerifier(nsIRequest *aRequest);
     
     // Handle all tasks about app installation like permission and system message
     // registration.
