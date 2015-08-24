@@ -4823,7 +4823,6 @@ NS_INTERFACE_MAP_BEGIN(nsHttpChannel)
     NS_INTERFACE_MAP_ENTRY(nsIChannel)
     NS_INTERFACE_MAP_ENTRY(nsIRequestObserver)
     NS_INTERFACE_MAP_ENTRY(nsIStreamListener)
-    NS_INTERFACE_MAP_ENTRY(nsIPackagedAppChannelListener)
     NS_INTERFACE_MAP_ENTRY(nsIHttpChannel)
     NS_INTERFACE_MAP_ENTRY(nsICacheInfoChannel)
     NS_INTERFACE_MAP_ENTRY(nsICachingChannel)
@@ -5220,7 +5219,7 @@ nsHttpChannel::BeginConnect()
 
         nsCOMPtr<nsIPrincipal> principal = GetURIPrincipal();
         nsCOMPtr<nsILoadContextInfo> loadInfo = GetLoadContextInfo(this);
-        rv = pas->GetResource(principal, loadFlags, loadInfo, this, this);
+        rv = pas->GetResource(principal, loadFlags, loadInfo, this);
         if (NS_FAILED(rv)) {
             AsyncAbort(rv);
         }
@@ -5627,26 +5626,6 @@ NS_IMETHODIMP
 nsHttpChannel::GetRequestMethod(nsACString& aMethod)
 {
     return HttpBaseChannel::GetRequestMethod(aMethod);
-}
-
-//-----------------------------------------------------------------------------
-// nsHttpChannel::nsIPackagedAppChannelListener
-//-----------------------------------------------------------------------------
-
-NS_IMETHODIMP
-nsHttpChannel::OnStartSignedPackageRequest(const nsACString& aNewOrigin)
-{
-    nsCOMPtr<nsIPackagedAppChannelListener> listener;
-    NS_QueryNotificationCallbacks(this, listener);
-
-    if (listener) {
-        LOG(("nsHttpChannel::OnStartSignedPackageRequest: notifying listener->OnStartSignedPackageRequest"));
-        listener->OnStartSignedPackageRequest(aNewOrigin);
-    } else {
-        LOG(("nsHttpChannel::OnStartSignedPackageRequest: listener %p is not nsIPackagedAppChannelListener", mListener.get()));
-    }
-
-    return NS_OK;
 }
 
 //-----------------------------------------------------------------------------

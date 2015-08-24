@@ -122,8 +122,6 @@ public:
     nsIXULBrowserWindow* GetXULBrowserWindow();
 
     void Destroy();
-    void Detach();
-    void Attach(nsFrameLoader* aFrameLoader);
 
     void RemoveWindowListeners();
     void AddWindowListeners();
@@ -440,13 +438,6 @@ public:
     virtual PWebBrowserPersistDocumentParent* AllocPWebBrowserPersistDocumentParent(const uint64_t& aOuterWindowID) override;
     virtual bool DeallocPWebBrowserPersistDocumentParent(PWebBrowserPersistDocumentParent* aActor) override;
 
-    already_AddRefed<nsIURI> GetCurrentLocation();
-
-    bool SendGotoBFCache();
-    bool SendResumeFromBFCache();
-
-    void SwitchProcessAndLoadURI(nsIURI* aURI);
-
 protected:
     bool ReceiveMessage(const nsString& aMessage,
                         bool aSync,
@@ -482,8 +473,6 @@ protected:
     virtual bool RecvAudioChannelActivityNotification(const uint32_t& aAudioChannel,
                                                       const bool& aActive) override;
 
-    virtual bool RecvLocationChange(const URIParams& aCurrentURI) override;
-
     bool InitBrowserConfiguration(const nsCString& aURI,
                                   BrowserConfiguration& aConfiguration);
 
@@ -498,7 +487,6 @@ protected:
     CSSToLayoutDeviceScale mDefaultScale;
     bool mUpdatedDimensions;
     LayoutDeviceIntPoint mChromeOffset;
-    nsCOMPtr<nsIURI> mCurrentLocation;
 
 private:
     already_AddRefed<nsFrameLoader> GetFrameLoader(bool aUseCachedFrameLoaderAfterDestroy = false) const;
@@ -525,8 +513,6 @@ private:
     bool mMarkedDestroying;
     // When true, the TabParent is invalid and we should not send IPC messages anymore.
     bool mIsDestroyed;
-    // When true, the TabParent is detached from the frame loader.
-    bool mIsDetached;
     // Whether we have already sent a FileDescriptor for the app package.
     bool mAppPackageFileDescriptorSent;
 

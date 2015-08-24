@@ -388,11 +388,6 @@ public:
     void SetNuwaParent(NuwaParent* aNuwaParent) { mNuwaParent = aNuwaParent; }
     void ForkNewProcess(bool aBlocking);
 
-    void CacheTabParent(TabParent* aTab);
-    void TakeTabParent(TabParent* aTab);
-
-    static TabParent* FindCachedTabParent(nsIURI* aURI);
-
 protected:
     void OnChannelConnected(int32_t pid) override;
     virtual void ActorDestroy(ActorDestroyReason why) override;
@@ -964,8 +959,6 @@ private:
     nsCString mProfile;
 
     UniquePtr<gfx::DriverCrashGuard> mDriverCrashGuard;
-
-    nsTArray<nsRefPtr<TabParent>> mCachedTabParents;
 };
 
 } // namespace dom
