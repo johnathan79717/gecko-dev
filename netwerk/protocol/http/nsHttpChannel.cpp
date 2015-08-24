@@ -5989,8 +5989,8 @@ nsHttpChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
     PROFILER_LABEL("nsHttpChannel", "OnDataAvailable",
         js::ProfileEntry::Category::NETWORK);
 
-//    LOG(("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%llu count=%u]\n",
-//        this, request, offset, count));
+    LOG(("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%llu count=%u]\n",
+        this, request, offset, count));
 
     // don't send out OnDataAvailable notifications if we've been canceled.
     if (mCanceled)
@@ -6286,7 +6286,6 @@ nsHttpChannel::SetIsSignedPackage(bool aIsSignedPackage)
     if (!mCacheEntry) {
         return NS_ERROR_NOT_AVAILABLE;
     }
-
     return mCacheEntry->SetMetaDataElement("is-signed-pak",
                                            aIsSignedPackage ? "1" : "0");
 }
@@ -6313,7 +6312,6 @@ nsHttpChannel::SetSignedPackageOrigin(const nsACString& aSignedPackageOrigin)
     if (!mCacheEntry) {
         return NS_ERROR_NOT_AVAILABLE;
     }
-
     return mCacheEntry->SetMetaDataElement("signed-pak-origin", 
                                            PromiseFlatCString(aSignedPackageOrigin).get());
 }

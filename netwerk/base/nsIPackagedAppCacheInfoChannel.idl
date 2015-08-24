@@ -4,10 +4,16 @@
 
 #include "nsISupports.idl"
 
+/**
+ * Packaged app specific cache info channel.
+ */
 [scriptable, uuid (856b1ae0-47e5-11e5-b970-0800200c9a66)]
 interface nsIPackagedAppCacheInfoChannel : nsISupports
 {
+  // Whether this channel is for a signed package.
   attribute boolean isSignedPackage;
 
+  // The origin for the signed package. If the package is not signed, it would be
+  // empty.
   attribute ACString signedPackageOrigin;  
 };

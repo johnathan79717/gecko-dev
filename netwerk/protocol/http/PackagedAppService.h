@@ -119,6 +119,8 @@ private:
     // Registers a callback which gets called when the given nsIURI is downloaded
     // aURI is the full URI of a subresource, composed of packageURI + !// + subresourcePath
     nsresult AddCallback(nsIURI *aURI, nsICacheEntryOpenCallback *aCallback);
+
+    // Remove the callback from the resource callback list.
     nsresult RemoveCallbacks(nsICacheEntryOpenCallback* aCallback);
 
     // Called by PackagedAppChannelListener to note the fact that the package
@@ -126,6 +128,8 @@ private:
     // package metadata is saved in the cache.
     void SetIsFromCache(bool aFromCache) { mIsFromCache = aFromCache; }
 
+    // Notify the observers who are interested in knowing a signed packaged content
+    // is about to load from either HTTP or cache..
     void NotifyOnStartSignedPackageRequest(const nsACString& PackageOrigin);
 
   private:
@@ -147,8 +151,13 @@ private:
     virtual void OnManifestVerified(ResourceCacheInfo* aInfo, bool aSuccess);
     virtual void OnResourceVerified(ResourceCacheInfo* aInfo, bool aSuccess);
 
+    // Handle all kinds of error during package downloading.
     void OnError(EErrorType aError);
+
+    // Called when the last part is complete or the resource is from cache.
     void FinalizeDownload(nsresult aStatusCode);
+
+    // Get the signature from the multipart channel.
     nsCString GetSignatureFromChannel(nsIMultiPartChannel* aChannel);
 
     // Start off a resource hash computation and feed the HTTP response header.

@@ -557,7 +557,7 @@ nsCString
 PackagedAppService::PackagedAppDownloader::GetSignatureFromChannel(nsIMultiPartChannel* aMulitChannel)
 {
   if (mIsFromCache) {
-    // TODO: How to get the signature from cache? Maybe from base channel.
+    // We don't need the signature if the resource is loaded from cache.
     return nsCString("");
   }
 
@@ -675,7 +675,6 @@ PackagedAppService::PackagedAppDownloader::ConsumeData(nsIInputStream *aStream,
   return self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
 }
 
-
 NS_IMETHODIMP
 PackagedAppService::PackagedAppDownloader::OnDataAvailable(nsIRequest *aRequest,
                                                            nsISupports *aContext,
@@ -707,8 +706,8 @@ PackagedAppService::PackagedAppDownloader::AddCallback(nsIURI *aURI,
       // right now, directly.  See also the CallCallbacks method bellow.
       LOG(("[%p]    > already downloaded\n", this));
 
-      // This is the case where a package downloader is still running and we peek data 
-      // from it.
+      // This is the case where a package downloader is still running and we 
+      // peek data from it.
 
       // TODO: Bug 1186290 to notify that the signed packaged content is ready
       //       to load.
@@ -835,8 +834,8 @@ PackagedAppService::PackagedAppDownloader::ClearCallbacks(nsresult aResult)
 void
 PackagedAppService::PackagedAppDownloader::NotifyOnStartSignedPackageRequest(const nsACString& aPackageOrigin)
 {
-  // TODO: Bug 1186290 to notify whoever wants to know the signed package is
-  //       ready to load.
+  // TODO: Bug 1186290 to notify whoever wants to know when the signed package is
+  //       about to load.
   LOG(("Notifying the signed package is ready to load."));
 }
 

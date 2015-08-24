@@ -73,6 +73,9 @@ public:
 
   ~PackagedAppVerifier() { }
 
+  //---------------------------------------------------------------------------
+  // Resource hash utility functions.
+  //---------------------------------------------------------------------------
   nsresult BeginResourceHash(const nsACString& aResourceURI);
   nsresult UpdateResourceHash(const uint8_t* aData, uint32_t aLen);
   nsresult EndResourceHash();
@@ -91,21 +94,25 @@ public:
   //
   void ProcessResourceCache(ResourceCacheInfo* aInfo);
 
+  // Returns the origin with the signed package verifier taking into account.
   nsCString GetPackageOrigin() const;
+
   bool IsPackageSigned() const;
 
 private:
+  // Queue a resource info and handle it later.
   void QueueResource(ResourceCacheInfo* aInfo);
 
   // This two functions would call the actual verifier.
   void VerifyManifest(ResourceCacheInfo* aInfo);
   void VerifyResource(ResourceCacheInfo* aInfo);
 
-  // FIXME: Remove until using the actual verifier. These two functions are
-  //        very likely to be wrapped around for the interal verifier callback.
+  // TODO: Remove until using the actual verifier. These two functions are
+  //       very likely to be wrapped around for the interal verifier callback.
   void OnManifestVerified(bool aSuccess);
   void OnResourceVerified(bool aSuccess);
 
+  // TODO: Remove this after Bug 1178518 is landed.
   void FireFakeSuccessEvent(bool aForManifest);
 
   PackagedAppVerifierListener* mListener;
