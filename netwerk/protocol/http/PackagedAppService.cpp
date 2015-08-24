@@ -210,17 +210,12 @@ PackagedAppService::CacheEntryWriter::CopyHeadersFromChannel(nsIChannel *aChanne
 }
 
 NS_METHOD
-PackagedAppService::CacheEntryWriter::ConsumeData(nsIInputStream *aStream,
-                                                  void *aClosure,
-                                                  const char *aFromRawSegment,
-                                                  uint32_t aToOffset,
-                                                  uint32_t aCount,
+PackagedAppService::CacheEntryWriter::ConsumeData(const char *aBuf, 
+                                                  uint32_t aCount, 
                                                   uint32_t *aWriteCount)
 {
-  MOZ_ASSERT(aClosure, "The closure must not be null");
-  CacheEntryWriter *self = static_cast<CacheEntryWriter*>(aClosure);
-  MOZ_ASSERT(self->mOutputStream, "The stream should not be null");
-  return self->mOutputStream->Write(aFromRawSegment, aCount, aWriteCount);
+  MOZ_ASSERT(mOutputStream, "The stream should not be null");
+  return mOutputStream->Write(aBuf, aCount, aWriteCount);
 }
 
 NS_IMETHODIMP
@@ -296,12 +291,8 @@ PackagedAppService::CacheEntryWriter::OnDataAvailable(nsIRequest *aRequest,
                                                       uint64_t aOffset,
                                                       uint32_t aCount)
 {
-  if (!aInputStream) {
-    return NS_ERROR_INVALID_ARG;
-  }
-  // Calls ConsumeData to read the data into the cache entry
-  uint32_t n;
-  return aInputStream->ReadSegments(ConsumeData, this, aCount, &n);
+  MOZ_ASSERT_UNREACHABLE("This function should never ever be called");
+  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -626,6 +617,31 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
   return NS_OK;
 }
 
+NS_METHOD
+PackagedAppService::PackagedAppDownloader::ConsumeData(nsIInputStream *aStream,
+                                                       void *aClosure,
+                                                       const char *aFromRawSegment,
+                                                       uint32_t aToOffset,
+                                                       uint32_t aCount,
+                                                       uint32_t *aWriteCount)
+{
+  MOZ_ASSERT(aClosure, "The closure must not be null");
+  
+  if (!aStream) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  PackagedAppDownloader *self = static_cast<PackagedAppDownloader*>(aClosure);
+
+  if (!self->mWriter) {
+    *aWriteCount = aCount;
+    return NS_OK;
+  }
+
+  return self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
+}
+
+
 NS_IMETHODIMP
 PackagedAppService::PackagedAppDownloader::OnDataAvailable(nsIRequest *aRequest,
                                                            nsISupports *aContext,
@@ -633,12 +649,8 @@ PackagedAppService::PackagedAppDownloader::OnDataAvailable(nsIRequest *aRequest,
                                                            uint64_t aOffset,
                                                            uint32_t aCount)
 {
-  if (!mWriter) {
-    uint32_t n;
-    return aInputStream->ReadSegments(NS_DiscardSegment, nullptr, aCount, &n);
-  }
-  return mWriter->OnDataAvailable(aRequest, aContext, aInputStream, aOffset,
-                                  aCount);
+  uint32_t n;
+  return aInputStream->ReadSegments(ConsumeData, this, aCount, &n);
 }
 
 nsresult
