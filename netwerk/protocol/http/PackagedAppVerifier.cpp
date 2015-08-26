@@ -24,13 +24,13 @@ namespace net {
 PackagedAppVerifier::PackagedAppVerifier(PackagedAppVerifierListener* aListener,
                                          const nsACString& aPackageOrigin,
                                          const nsACString& aSignature,
-                                         nsIPackagedAppCacheInfoChannel* aCacheInfoChannel)
+                                         nsICacheEntry* aPackageCacheEntry)
   : mListener(aListener)
   , mState(STATE_UNKNOWN)
   , mPackageOrigin(aPackageOrigin)
   , mSignature(aSignature)
   , mIsPackageSigned(false)
-  , mCacheInfoChannel(aCacheInfoChannel)
+  , mPackageCacheEntry(aPackageCacheEntry)
 {
   nsresult rv;
   mHasher = do_CreateInstance("@mozilla.org/security/hash;1", &rv);
@@ -104,15 +104,15 @@ PackagedAppVerifier::FireFakeSuccessEvent(bool aForManifest)
   nsCOMPtr<nsIRunnable> r;
 
   if (aForManifest) {
-    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this, 
-                                                    &PackagedAppVerifier::OnManifestVerified, 
+    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this,
+                                                    &PackagedAppVerifier::OnManifestVerified,
                                                     true);
   } else {
-    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this, 
-                                                    &PackagedAppVerifier::OnResourceVerified, 
+    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this,
+                                                    &PackagedAppVerifier::OnResourceVerified,
                                                     true);
   }
-    
+
   NS_DispatchToMainThread(r);
 }
 
@@ -127,7 +127,7 @@ PackagedAppVerifier::VerifyManifest(ResourceCacheInfo* aInfo)
 
 #if 0
   mTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
-  
+
   nsTimerCallbackFunc cb = [](nsITimer* aTimer, void* aClosure) {
     LOG(("Fake VerifyManifest timer called back. Fire event for OnManifestVerified now."));
     auto self = static_cast<PackagedAppVerifier*>(aClosure);
@@ -149,7 +149,7 @@ PackagedAppVerifier::VerifyResource(ResourceCacheInfo* aInfo)
   nsAutoCString uriAsAscii;
   aInfo->mURI->GetAsciiSpec(uriAsAscii);
   nsCString* resourceHash = mResourceHashHash.Get(uriAsAscii);
-     
+
   if (!resourceHash) {
     LOG(("Hash value for %s is not computed. ERROR!", uriAsAscii.get()));
     MOZ_CRASH();
@@ -177,11 +177,13 @@ PackagedAppVerifier::OnManifestVerified(bool aSuccess)
   // TODO: Update mPackageOrigin.
 
   // If the package is signed, add related info to the package cache.
-  if (mIsPackageSigned && mCacheInfoChannel) {
+  if (mIsPackageSigned && mPackageCacheEntry) {
     LOG(("This package is signed. Add this info to the cache channel."));
-    mCacheInfoChannel->SetIsSignedPackage(true);
-    mCacheInfoChannel->SetSignedPackageOrigin(mPackageOrigin);
-    mCacheInfoChannel = nullptr; // the cache channel is no longer needed.
+    if (mPackageCacheEntry) {
+      mPackageCacheEntry->SetMetaDataElement("signed-pak-origin",
+                                             mPackageOrigin.get());
+    }
+    mPackageCacheEntry = nullptr; // the cache entry is no longer needed.
   }
 
   ResourceCacheInfo* info = mPendingResourceCacheInfoList.popFirst();

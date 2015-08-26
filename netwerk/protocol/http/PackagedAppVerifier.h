@@ -10,7 +10,6 @@
 #include "mozilla/LinkedList.h"
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
-#include "nsIPackagedAppCacheInfoChannel.h"
 #include "nsClassHashtable.h"
 #include "nsHashKeys.h"
 #include "nsICryptoHash.h"
@@ -27,7 +26,7 @@ class PackagedAppVerifier final
 public:
   enum EState {
     // The initial state.
-	  STATE_UNKNOWN,
+    STATE_UNKNOWN,
 
     // When we are notified to process the first resource, we will start to
     // verify the manifest and go to this state no matter the package has
@@ -69,7 +68,7 @@ public:
   PackagedAppVerifier(PackagedAppVerifierListener* aListener,
                       const nsACString& aPackageOrigin,
                       const nsACString& aSignature,
-                      nsIPackagedAppCacheInfoChannel* aCacheInfoChannel);
+                      nsICacheEntry* aPackageCacheEntry);
 
   ~PackagedAppVerifier() { }
 
@@ -124,7 +123,7 @@ private:
   bool mIsPackageSigned;
 
   nsCOMPtr<nsITimer> mTimer;
-  nsCOMPtr<nsIPackagedAppCacheInfoChannel> mCacheInfoChannel;
+  nsCOMPtr<nsICacheEntry> mPackageCacheEntry;
 
   // For resource hash computation.
   nsCString mHashingResourceURI;

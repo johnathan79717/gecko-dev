@@ -4844,7 +4844,6 @@ NS_INTERFACE_MAP_BEGIN(nsHttpChannel)
     NS_INTERFACE_MAP_ENTRY(nsIThreadRetargetableStreamListener)
     NS_INTERFACE_MAP_ENTRY(nsIDNSListener)
     NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
-    NS_INTERFACE_MAP_ENTRY(nsIPackagedAppCacheInfoChannel)
     // we have no macro that covers this case.
     if (aIID.Equals(NS_GET_IID(nsHttpChannel)) ) {
         AddRef();
@@ -6275,63 +6274,6 @@ nsHttpChannel::SetCacheTokenCachedCharset(const nsACString &aCharset)
 
     return mCacheEntry->SetMetaDataElement("charset",
                                            PromiseFlatCString(aCharset).get());
-}
-
-//-----------------------------------------------------------------------------
-// nsHttpChannel::nsIPackagedAppCacheInfoChannel
-//-----------------------------------------------------------------------------
-NS_IMETHODIMP
-nsHttpChannel::SetIsSignedPackage(bool aIsSignedPackage)
-{
-    if (!mCacheEntry) {
-        return NS_ERROR_NOT_AVAILABLE;
-    }
-    return mCacheEntry->SetMetaDataElement("is-signed-pak",
-                                           aIsSignedPackage ? "1" : "0");
-}
-
-NS_IMETHODIMP
-nsHttpChannel::GetIsSignedPackage(bool *aIsSignedPackage)
-{
-    if (!mCacheEntry) {
-        return NS_ERROR_NOT_AVAILABLE;
-    }
- 
-    nsXPIDLCString isSignedPackage;
-    nsresult rv = mCacheEntry->GetMetaDataElement("is-signed-pak",
-                                                  getter_Copies(isSignedPackage));
-
-    *aIsSignedPackage = NS_SUCCEEDED(rv) && isSignedPackage.Equals("1");
-
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsHttpChannel::SetSignedPackageOrigin(const nsACString& aSignedPackageOrigin)
-{
-    if (!mCacheEntry) {
-        return NS_ERROR_NOT_AVAILABLE;
-    }
-    return mCacheEntry->SetMetaDataElement("signed-pak-origin", 
-                                           PromiseFlatCString(aSignedPackageOrigin).get());
-}
-
-NS_IMETHODIMP
-nsHttpChannel::GetSignedPackageOrigin(nsACString& aSignedPackageOrigin)
-{
-    if (!mCacheEntry) {
-        return NS_ERROR_NOT_AVAILABLE;
-    }
- 
-    nsXPIDLCString signedPackageOrigin;
-    nsresult rv = mCacheEntry->GetMetaDataElement("signed-pak-origin",
-                                                  getter_Copies(signedPackageOrigin));
-
-    if (NS_SUCCEEDED(rv)) {
-        aSignedPackageOrigin = signedPackageOrigin;
-    }
-
-    return NS_OK;
 }
 
 //-----------------------------------------------------------------------------
