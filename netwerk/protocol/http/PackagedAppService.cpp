@@ -16,6 +16,7 @@
 #include "mozilla/Logging.h"
 #include "mozilla/DebugOnly.h"
 #include "nsIHttpHeaderVisitor.h"
+#include "mozilla/Preferences.h"
 
 namespace mozilla {
 namespace net {
@@ -25,6 +26,8 @@ static PackagedAppService *gPackagedAppService = nullptr;
 static PRLogModuleInfo *gPASLog = nullptr;
 #undef LOG
 #define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
+
+static bool gDeveloperMode = false;
 
 NS_IMPL_ISUPPORTS(PackagedAppService, nsIPackagedAppService)
 
@@ -333,8 +336,9 @@ PackagedAppService::PackagedAppChannelListener::OnStartRequest(nsIRequest *aRequ
     nsCString signedPackageOrigin;
     nsCOMPtr<nsICacheEntry> packageCacheEntry = GetPackageCacheEntry(aRequest);
     if (packageCacheEntry) {
+      const char* key = PackagedAppVerifier::kSignedPakOriginMetadataKey;
       nsXPIDLCString value;
-      nsresult rv = packageCacheEntry->GetMetaDataElement("signed-pak-origin",
+      nsresult rv = packageCacheEntry->GetMetaDataElement(key,
                                                           getter_Copies(value));
       isPackageSigned = (NS_SUCCEEDED(rv) && !value.IsEmpty());
       signedPackageOrigin = value;
@@ -413,10 +417,12 @@ PackagedAppService::PackagedAppDownloader::BeginHashComputation(nsIURI* aURI,
   aURI->GetAsciiSpec(uriAsAscii);
   mVerifier->BeginResourceHash(uriAsAscii);
 
-  // Feed the flattened and original header to the hasher.
+  // TODO: The flattened http header might be different from the original.
+  //       Bug 1198669 will add a API to nsIMultipartChannel to get the original
+  //       http header.
   nsAutoCString head;
   responseHead->Flatten(head, true);
-  head.Append("\n");
+  head.Append("\r\n");
 
   return mVerifier->UpdateResourceHash((const uint8_t*)head.get(), head.Length());
 }
@@ -437,7 +443,8 @@ PackagedAppService::PackagedAppDownloader::EnsureVerifier(nsIRequest *aRequest)
   mVerifier = new PackagedAppVerifier(this,
                                       mPackageOrigin,
                                       signature,
-                                      packageCacheEntry);
+                                      packageCacheEntry,
+                                      gDeveloperMode);
 }
 
 NS_IMETHODIMP
@@ -569,18 +576,16 @@ PackagedAppService::PackagedAppDownloader::GetSignatureFromChannel(nsIMultiPartC
 {
   if (mIsFromCache) {
     // We don't need the signature if the resource is loaded from cache.
-    return nsCString("");
+    return EmptyCString();
   }
 
   if (!aMulitChannel) {
     LOG(("The package is either not loaded from cache or malformed."));
-    return nsCString("");
+    return EmptyCString();
   }
 
   nsCString packageHeader;
   aMulitChannel->GetPreamble(packageHeader);
-
-  packageHeader.Assign("testing");
 
   return packageHeader;
 }
@@ -637,13 +642,9 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
   // We don't need the writer anymore - this will close its stream
   mWriter = nullptr;
 
-  // TODO: |info| has to be explicitly deleted in On[Manifest|Resource]Verified.
-  // Try to avoid this bad practice when the use of ResourceCacheInfo is
-  // getting complicated.
-  ResourceCacheInfo* info = new ResourceCacheInfo(uri, entry, aStatusCode, lastPart);
-
-  // The downloader only needs to focus on PackagedAppVerifierListener callbacks.
+  // The downloader only needs to focus on PackagedAppVerifierListener callback.
   // The PackagedAppVerifier would handle the manifest/resource verification.
+  ResourceCacheInfo info(uri, entry, aStatusCode, lastPart);
   mVerifier->ProcessResourceCache(info);
 
   return NS_OK;
@@ -775,19 +776,6 @@ PackagedAppService::PackagedAppDownloader::CallCallbacks(nsIURI *aURI,
 }
 
 nsresult
-PackagedAppService::PackagedAppDownloader::RemoveCallbacks(nsICacheEntryOpenCallback* aCallback)
-{
-  MOZ_RELEASE_ASSERT(NS_IsMainThread(), "mCallbacks hashtable is not thread safe");
-
-  for (auto iter = mCallbacks.Iter(); !iter.Done(); iter.Next()) {
-    nsCOMArray<nsICacheEntryOpenCallback>* callbackArray = iter.UserData();
-    callbackArray->RemoveObject(aCallback);
-  }
-
-  return NS_OK;
-}
-
-nsresult
 PackagedAppService::PackagedAppDownloader::ClearCallbacks(nsresult aResult)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "mCallbacks hashtable is not thread safe");
@@ -851,18 +839,16 @@ void PackagedAppService::PackagedAppDownloader::InstallSignedPackagedApp()
 //------------------------------------------------------------------
 
 void
-PackagedAppService::PackagedAppDownloader::OnManifestVerified(ResourceCacheInfo* aInfo,
+PackagedAppService::PackagedAppDownloader::OnManifestVerified(const ResourceCacheInfo& aInfo,
                                                               bool aSuccess)
 {
-  nsAutoPtr<ResourceCacheInfo> autoInfo(aInfo);
-
   if (!aSuccess) {
     // The signature is found but not verified.
     return OnError(ERROR_MANIFEST_VERIFIED_FAILED);
   }
 
   // TODO: If we disallow the request for the manifest file, do NOT callback here.
-  CallCallbacks(aInfo->mURI, aInfo->mCacheEntry, aInfo->mStatusCode);
+  CallCallbacks(aInfo.mURI, aInfo.mCacheEntry, aInfo.mStatusCode);
 
   if (!mVerifier->IsPackageSigned()) {
     // A verified but unsigned manifest means this package has no signature.
@@ -875,21 +861,19 @@ PackagedAppService::PackagedAppDownloader::OnManifestVerified(ResourceCacheInfo*
 }
 
 void
-PackagedAppService::PackagedAppDownloader::OnResourceVerified(ResourceCacheInfo* aInfo,
+PackagedAppService::PackagedAppDownloader::OnResourceVerified(const ResourceCacheInfo& aInfo,
                                                               bool aSuccess)
 {
-  nsAutoPtr<ResourceCacheInfo> autoInfo(aInfo);
-
   if (!aSuccess) {
     return OnError(ERROR_RESOURCE_VERIFIED_FAILED);
   }
 
   // Serve this resource to all listeners.
-  CallCallbacks(aInfo->mURI, aInfo->mCacheEntry, aInfo->mStatusCode);
+  CallCallbacks(aInfo.mURI, aInfo.mCacheEntry, aInfo.mStatusCode);
 
-  if (aInfo->mIsLastPart) {
-    LOG(("This is the last part. FinalizeDownload (%d)", aInfo->mStatusCode));
-    FinalizeDownload(aInfo->mStatusCode);
+  if (aInfo.mIsLastPart) {
+    LOG(("This is the last part. FinalizeDownload (%d)", aInfo.mStatusCode));
+    FinalizeDownload(aInfo.mStatusCode);
   }
 }
 
@@ -900,6 +884,9 @@ PackagedAppService::PackagedAppService()
   gPackagedAppService = this;
   gPASLog = PR_NewLogModule("PackagedAppService");
   LOG(("[%p] Created PackagedAppService\n", this));
+
+  Preferences::AddBoolVarCache(&gDeveloperMode,
+                               "network.http.packaged-apps-developer-mode", false);
 }
 
 PackagedAppService::~PackagedAppService()

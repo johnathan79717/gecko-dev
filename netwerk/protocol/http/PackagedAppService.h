@@ -66,8 +66,8 @@ private:
     nsCOMPtr<nsICacheEntry> mEntry;
 
     // Called by PackagedAppDownloader to write data to the cache entry.
-    NS_METHOD ConsumeData(const char *aBuf, 
-                          uint32_t aCount, 
+    NS_METHOD ConsumeData(const char *aBuf,
+                          uint32_t aCount,
                           uint32_t *aWriteCount);
 
   private:
@@ -114,7 +114,7 @@ private:
     // used to remove this object from PackagedAppService::mDownloadingPackages
     // - aKey is a string which uniquely identifies this package within the
     //   packagedAppService
-    nsresult Init(nsILoadContextInfo* aInfo, const nsCString &aKey, 
+    nsresult Init(nsILoadContextInfo* aInfo, const nsCString &aKey,
                                              const nsACString& aPackageOrigin);
     // Registers a callback which gets called when the given nsIURI is downloaded
     // aURI is the full URI of a subresource, composed of packageURI + !// + subresourcePath
@@ -136,7 +136,7 @@ private:
     ~PackagedAppDownloader() { }
 
     // Static method used to write data into the cache entry or discard
-    // if there's no writer. Used as a writer function of 
+    // if there's no writer. Used as a writer function of
     // nsIInputStream::ReadSegments.
     static NS_METHOD ConsumeData(nsIInputStream *aStream,
                                  void *aClosure,
@@ -148,8 +148,8 @@ private:
     //---------------------------------------------------------------
     // For PackagedAppVerifierListener.
     //---------------------------------------------------------------
-    virtual void OnManifestVerified(ResourceCacheInfo* aInfo, bool aSuccess);
-    virtual void OnResourceVerified(ResourceCacheInfo* aInfo, bool aSuccess);
+    virtual void OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSuccess);
+    virtual void OnResourceVerified(const ResourceCacheInfo& aInfo, bool aSuccess);
 
     // Handle all kinds of error during package downloading.
     void OnError(EErrorType aError);
@@ -165,7 +165,7 @@ private:
 
     // Ensure a packaged app verifier is created.
     void EnsureVerifier(nsIRequest *aRequest);
-    
+
     // Handle all tasks about app installation like permission and system message
     // registration.
     void InstallSignedPackagedApp();

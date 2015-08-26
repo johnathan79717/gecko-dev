@@ -12,33 +12,45 @@
 #include "nsThreadUtils.h"
 #include "PackagedAppVerifier.h"
 #include "nsITimer.h"
-#include "nsICryptoHash.h"
 
-const short kResourceHashType = nsICryptoHash::SHA256;
+static const short kResourceHashType = nsICryptoHash::SHA256;
+static const char* kTestingSignature = "THIS.IS.TESTING.SIGNATURE";
 
 namespace mozilla {
 namespace net {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const char* PackagedAppVerifier::kSignedPakOriginMetadataKey = "signed-pak-origin";
+
 PackagedAppVerifier::PackagedAppVerifier(PackagedAppVerifierListener* aListener,
                                          const nsACString& aPackageOrigin,
                                          const nsACString& aSignature,
-                                         nsICacheEntry* aPackageCacheEntry)
+                                         nsICacheEntry* aPackageCacheEntry,
+                                         bool aDeveloperMode)
   : mListener(aListener)
   , mState(STATE_UNKNOWN)
   , mPackageOrigin(aPackageOrigin)
   , mSignature(aSignature)
   , mIsPackageSigned(false)
   , mPackageCacheEntry(aPackageCacheEntry)
+  , mDeveloperMode(aDeveloperMode)
 {
-  nsresult rv;
-  mHasher = do_CreateInstance("@mozilla.org/security/hash;1", &rv);
+  if (mDeveloperMode && mSignature.IsEmpty()) {
+    LOG(("No signature but in developer mode ==> Assign a testing signature."));
+    mSignature.Assign(kTestingSignature);
+  }
 }
 
 nsresult
 PackagedAppVerifier::BeginResourceHash(const nsACString& aResourceURI)
 {
+  if (!mHasher) {
+    mHasher = do_CreateInstance("@mozilla.org/security/hash;1");
+  }
+
+  NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
+
   mHashingResourceURI = aResourceURI;
   return mHasher->Init(kResourceHashType);
 }
@@ -47,6 +59,7 @@ nsresult
 PackagedAppVerifier::UpdateResourceHash(const uint8_t* aData, uint32_t aLen)
 {
   MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
+  NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
   return mHasher->Update(aData, aLen);
 }
 
@@ -54,24 +67,21 @@ nsresult
 PackagedAppVerifier::EndResourceHash()
 {
   MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
-  nsAutoCString hash;
-  nsresult rv = mHasher->Finish(true, hash);
+  NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
+
+  nsresult rv = mHasher->Finish(true, mLastComputedResourceHash);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  LOG(("Hash of %s is %s", mHashingResourceURI.get(), hash.get()));
+  LOG(("Hash of %s is %s", mHashingResourceURI.get(),
+                           mLastComputedResourceHash.get()));
 
-  // Store the hash for the resource.
-  mResourceHashHash.Put(mHashingResourceURI, new nsCString(hash));
-  mHashingResourceURI = "";
   return NS_OK;
 }
 
 void
-PackagedAppVerifier::ProcessResourceCache(ResourceCacheInfo* aInfo)
+PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo& aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "OnResourceCached must be on main thread");
-
-  QueueResource(aInfo);
 
   switch (mState) {
   case STATE_UNKNOWN:
@@ -79,17 +89,12 @@ PackagedAppVerifier::ProcessResourceCache(ResourceCacheInfo* aInfo)
     VerifyManifest(aInfo);
     break;
 
-  case STATE_MANIFEST_VERIFYING:
-    // A resource is cached in the middle of manifest verification. Queue it and
-    // verify it until we make sure the manifest is verified.
-    break;
-
   case STATE_MANIFEST_VERIFIED_OK:
     VerifyResource(aInfo);
     break;
 
   case STATE_MANIFEST_VERIFIED_FAILED:
-    OnResourceVerified(false);
+    OnResourceVerified(aInfo, false);
     break;
 
   default:
@@ -99,71 +104,55 @@ PackagedAppVerifier::ProcessResourceCache(ResourceCacheInfo* aInfo)
 }
 
 void
-PackagedAppVerifier::FireFakeSuccessEvent(bool aForManifest)
-{
-  nsCOMPtr<nsIRunnable> r;
-
-  if (aForManifest) {
-    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this,
-                                                    &PackagedAppVerifier::OnManifestVerified,
-                                                    true);
-  } else {
-    r = NS_NewNonOwningRunnableMethodWithArgs<bool>(this,
-                                                    &PackagedAppVerifier::OnResourceVerified,
-                                                    true);
-  }
-
-  NS_DispatchToMainThread(r);
-}
-
-void
-PackagedAppVerifier::VerifyManifest(ResourceCacheInfo* aInfo)
+PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo& aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Manifest verification must be on main thread");
 
-  mState = STATE_MANIFEST_VERIFYING;
+  LOG(("Ready to verify manifest."));
 
-  FireFakeSuccessEvent(true);
-
-#if 0
-  mTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
-
-  nsTimerCallbackFunc cb = [](nsITimer* aTimer, void* aClosure) {
-    LOG(("Fake VerifyManifest timer called back. Fire event for OnManifestVerified now."));
-    auto self = static_cast<PackagedAppVerifier*>(aClosure);
-    // FIXME: Fire a fake successful OnManifestVerified event.
-    self->FireFakeSuccessEvent(true);
-  };
-
-  mTimer->InitWithFuncCallback(cb, this, 5000, nsITimer::TYPE_ONE_SHOT);
-#endif
-
-  // TODO: Call the manifest verification function implemented in Bug 1178518.
-}
-
-void
-PackagedAppVerifier::VerifyResource(ResourceCacheInfo* aInfo)
-{
-  MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Resource resource must be on main thread");
-
-  nsAutoCString uriAsAscii;
-  aInfo->mURI->GetAsciiSpec(uriAsAscii);
-  nsCString* resourceHash = mResourceHashHash.Get(uriAsAscii);
-
-  if (!resourceHash) {
-    LOG(("Hash value for %s is not computed. ERROR!", uriAsAscii.get()));
-    MOZ_CRASH();
+  if (mDeveloperMode) {
+    LOG(("Developer mode! Bypass verification."));
+    OnManifestVerified(aInfo, true);
+    return;
   }
 
-  LOG(("Checking the resource integrity. '%s'", resourceHash->get()));
-  // TODO: Call the integrity check function implemented in Bug 1178518.
+  if (mSignature.IsEmpty()) {
+    LOG(("No signature. No need to do verification."));
+    OnManifestVerified(aInfo, true);
+    return;
+  }
 
-  // FIXME: Fire a fake successful OnResourceVerified event.
-  FireFakeSuccessEvent(false);
+  // TODO: Implement manifest verification.
+  LOG(("Manifest verification not implemented yet. See Bug 1178518."));
+  OnManifestVerified(aInfo, false);
 }
 
 void
-PackagedAppVerifier::OnManifestVerified(bool aSuccess)
+PackagedAppVerifier::VerifyResource(const ResourceCacheInfo& aInfo)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Resource verification must be on main thread");
+
+  LOG(("Checking the resource integrity. '%s'", mLastComputedResourceHash.get()));
+
+  if (mDeveloperMode) {
+    LOG(("Developer mode! Bypass integrity check."));
+    OnResourceVerified(aInfo, true);
+    return;
+  }
+
+  if (mSignature.IsEmpty()) {
+    LOG(("No signature. No need to do resource integrity check."));
+    OnResourceVerified(aInfo, true);
+    return;
+  }
+
+  // TODO: Implement resource integrity check.
+  LOG(("Resource integrity check not implemented yet. See Bug 1178518."));
+  OnResourceVerified(aInfo, false);
+}
+
+void
+PackagedAppVerifier::OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSuccess)
 {
   LOG(("PackagedAppVerifier::OnManifestVerified: %d", aSuccess));
 
@@ -180,43 +169,21 @@ PackagedAppVerifier::OnManifestVerified(bool aSuccess)
   if (mIsPackageSigned && mPackageCacheEntry) {
     LOG(("This package is signed. Add this info to the cache channel."));
     if (mPackageCacheEntry) {
-      mPackageCacheEntry->SetMetaDataElement("signed-pak-origin",
+      mPackageCacheEntry->SetMetaDataElement(kSignedPakOriginMetadataKey,
                                              mPackageOrigin.get());
+      mPackageCacheEntry = nullptr; // the cache entry is no longer needed.
     }
-    mPackageCacheEntry = nullptr; // the cache entry is no longer needed.
   }
 
-  ResourceCacheInfo* info = mPendingResourceCacheInfoList.popFirst();
-  MOZ_ASSERT(info);
-
-  mListener->OnManifestVerified(info, aSuccess);
-
-  if (!aSuccess) {
-    return;
-  }
-
-  LOG(("Ready to verify resources that were cached during verification"));
-  // Verify the resources which were cached during verification accordingly.
-  info = mPendingResourceCacheInfoList.getFirst();
-  for (; info; info = info->getNext()) {
-    VerifyResource(info);
-  }
+  mListener->OnManifestVerified(aInfo, aSuccess);
 }
 
 void
-PackagedAppVerifier::OnResourceVerified(bool aSuccess)
+PackagedAppVerifier::OnResourceVerified(const ResourceCacheInfo& aInfo, bool aSuccess)
 {
-  ResourceCacheInfo* info = mPendingResourceCacheInfoList.popFirst();
-  MOZ_ASSERT(info);
-
-  // Must be called on main thread.
-  mListener->OnResourceVerified(info, aSuccess);
-}
-
-void
-PackagedAppVerifier::QueueResource(ResourceCacheInfo* aInfo)
-{
-  mPendingResourceCacheInfoList.insertBack(aInfo);
+  MOZ_RELEASE_ASSERT(NS_IsMainThread(),
+                     "PackagedAppVerifier::OnResourceVerified must be on main thread");
+  mListener->OnResourceVerified(aInfo, aSuccess);
 }
 
 nsCString

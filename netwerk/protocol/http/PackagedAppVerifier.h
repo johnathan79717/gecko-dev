@@ -7,7 +7,6 @@
 #ifndef mozilla_net_PackagedAppVerifier_h
 #define mozilla_net_PackagedAppVerifier_h
 
-#include "mozilla/LinkedList.h"
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
 #include "nsClassHashtable.h"
@@ -27,11 +26,6 @@ public:
   enum EState {
     // The initial state.
     STATE_UNKNOWN,
-
-    // When we are notified to process the first resource, we will start to
-    // verify the manifest and go to this state no matter the package has
-    // signature or not.
-    STATE_MANIFEST_VERIFYING,
 
     // Either the package has no signature or the manifest is verified
     // successfully will we be in this state.
@@ -68,7 +62,8 @@ public:
   PackagedAppVerifier(PackagedAppVerifierListener* aListener,
                       const nsACString& aPackageOrigin,
                       const nsACString& aSignature,
-                      nsICacheEntry* aPackageCacheEntry);
+                      nsICacheEntry* aPackageCacheEntry,
+                      bool aDeveloperMode = false);
 
   ~PackagedAppVerifier() { }
 
@@ -91,44 +86,55 @@ public:
   //    ------------------------------------------------------------------------
   //    Otherwise, the resource will be called back here.
   //
-  void ProcessResourceCache(ResourceCacheInfo* aInfo);
+  void ProcessResourceCache(const ResourceCacheInfo& aInfo);
 
   // Returns the origin with the signed package verifier taking into account.
   nsCString GetPackageOrigin() const;
 
   bool IsPackageSigned() const;
 
+  static const char* kSignedPakOriginMetadataKey;
+
 private:
-  // Queue a resource info and handle it later.
-  void QueueResource(ResourceCacheInfo* aInfo);
-
   // This two functions would call the actual verifier.
-  void VerifyManifest(ResourceCacheInfo* aInfo);
-  void VerifyResource(ResourceCacheInfo* aInfo);
+  void VerifyManifest(const ResourceCacheInfo& aInfo);
+  void VerifyResource(const ResourceCacheInfo& aInfo);
 
-  // TODO: Remove until using the actual verifier. These two functions are
-  //       very likely to be wrapped around for the interal verifier callback.
-  void OnManifestVerified(bool aSuccess);
-  void OnResourceVerified(bool aSuccess);
+  void OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSuccess);
+  void OnResourceVerified(const ResourceCacheInfo& aInfo, bool aSuccess);
 
-  // TODO: Remove this after Bug 1178518 is landed.
-  void FireFakeSuccessEvent(bool aForManifest);
-
+  // To notify that either manifest or resource check is done.
   PackagedAppVerifierListener* mListener;
-  mozilla::LinkedList<ResourceCacheInfo> mPendingResourceCacheInfoList;
 
+  // The internal verification state.
   EState mState;
+
+  // Initialized as a normal origin. Will be updated once we verified the manifest.
   nsCString mPackageOrigin;
+
+  // The signature of the package.
   nsCString mSignature;
+
+  // Whether this package app is signed.
   bool mIsPackageSigned;
 
-  nsCOMPtr<nsITimer> mTimer;
+  // The package cache entry (e.g. http://foo.com/app.pak) used to store
+  // any necessarry signed package information.
   nsCOMPtr<nsICacheEntry> mPackageCacheEntry;
 
-  // For resource hash computation.
+  // The resource URI that we are computing its hash.
   nsCString mHashingResourceURI;
+
+  // Used to compute resource's hash value.
   nsCOMPtr<nsICryptoHash> mHasher;
-  nsClassHashtable<nsCStringHashKey, nsCString> mResourceHashHash;
+
+  // The last computed hash value for a resource. It will be set on every
+  // |EndResourceHash| call.
+  nsCString mLastComputedResourceHash;
+
+  // If it's true, all the verification will be skipped and the package will
+  // be treated signed.
+  bool mDeveloperMode;
 }; // class PackagedAppVerifier
 
 class PackagedAppVerifierListener
@@ -137,8 +143,8 @@ public:
 	typedef PackagedAppVerifier::ResourceCacheInfo ResourceCacheInfo;
 
 public:
-	virtual void OnManifestVerified(ResourceCacheInfo* aInfo, bool aSuccess) = 0;
-	virtual void OnResourceVerified(ResourceCacheInfo* aInfo, bool aSuccess) = 0;
+	virtual void OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSuccess) = 0;
+	virtual void OnResourceVerified(const ResourceCacheInfo& aInfo, bool aSuccess) = 0;
 };
 
 } // namespace net
