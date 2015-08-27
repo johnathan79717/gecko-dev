@@ -12,6 +12,7 @@
 #include "nsThreadUtils.h"
 #include "PackagedAppVerifier.h"
 #include "nsITimer.h"
+#include "nsIPackagedAppVerifier.h"
 
 static const short kResourceHashType = nsICryptoHash::SHA256;
 static const char* kTestingSignature = "THIS.IS.TESTING.SIGNATURE";
@@ -21,9 +22,13 @@ namespace net {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier)
+
+NS_IMPL_ISUPPORTS(PackagedAppVerifier::ResourceCacheInfo, nsISupports)
+
 const char* PackagedAppVerifier::kSignedPakOriginMetadataKey = "signed-pak-origin";
 
-PackagedAppVerifier::PackagedAppVerifier(PackagedAppVerifierListener* aListener,
+PackagedAppVerifier::PackagedAppVerifier(nsIPackagedAppVerifierListener* aListener,
                                          const nsACString& aPackageOrigin,
                                          const nsACString& aSignature,
                                          nsICacheEntry* aPackageCacheEntry,
@@ -42,8 +47,15 @@ PackagedAppVerifier::PackagedAppVerifier(PackagedAppVerifierListener* aListener,
   }
 }
 
-nsresult
-PackagedAppVerifier::BeginResourceHash(const nsACString& aResourceURI)
+//----------------------------------------------------------------------
+// nsIStreamListener
+//----------------------------------------------------------------------
+
+// @param aRequest nullptr.
+// @param aContext The URI of the resource. (nsIURI)
+NS_IMETHODIMP
+PackagedAppVerifier::OnStartRequest(nsIRequest *aRequest,
+                                    nsISupports *aContext)
 {
   if (!mHasher) {
     mHasher = do_CreateInstance("@mozilla.org/security/hash;1");
@@ -51,20 +63,37 @@ PackagedAppVerifier::BeginResourceHash(const nsACString& aResourceURI)
 
   NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
 
-  mHashingResourceURI = aResourceURI;
+  nsCOMPtr<nsIURI> uri = do_QueryInterface(aContext);
+  NS_ENSURE_TRUE(uri, NS_ERROR_FAILURE);
+  uri->GetAsciiSpec(mHashingResourceURI);
+
   return mHasher->Init(kResourceHashType);
 }
 
-nsresult
-PackagedAppVerifier::UpdateResourceHash(const uint8_t* aData, uint32_t aLen)
+// @param aRequest nullptr.
+// @param aContext nullptr.
+// @param aInputStream as-is.
+// @param aOffset as-is.
+// @param aCount as-is.
+NS_IMETHODIMP
+PackagedAppVerifier::OnDataAvailable(nsIRequest *aRequest,
+                                     nsISupports *aContext,
+                                     nsIInputStream *aInputStream,
+                                     uint64_t aOffset,
+                                     uint32_t aCount)
 {
   MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
   NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
-  return mHasher->Update(aData, aLen);
+  return mHasher->UpdateFromStream(aInputStream, aCount);
 }
 
-nsresult
-PackagedAppVerifier::EndResourceHash()
+// @param aRequest nullptr.
+// @param aContext The resource cache info.
+// @param aStatusCode as-is,
+NS_IMETHODIMP
+PackagedAppVerifier::OnStopRequest(nsIRequest* aRequest,
+                                    nsISupports* aContext,
+                                    nsresult aStatusCode)
 {
   MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
   NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
@@ -75,11 +104,13 @@ PackagedAppVerifier::EndResourceHash()
   LOG(("Hash of %s is %s", mHashingResourceURI.get(),
                            mLastComputedResourceHash.get()));
 
+  ProcessResourceCache(static_cast<ResourceCacheInfo*>(aContext));
+
   return NS_OK;
 }
 
 void
-PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo& aInfo)
+PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "OnResourceCached must be on main thread");
 
@@ -104,7 +135,7 @@ PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo& aInfo)
 }
 
 void
-PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo& aInfo)
+PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Manifest verification must be on main thread");
 
@@ -128,7 +159,7 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo& aInfo)
 }
 
 void
-PackagedAppVerifier::VerifyResource(const ResourceCacheInfo& aInfo)
+PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "Resource verification must be on main thread");
 
@@ -152,7 +183,7 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo& aInfo)
 }
 
 void
-PackagedAppVerifier::OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSuccess)
+PackagedAppVerifier::OnManifestVerified(const ResourceCacheInfo* aInfo, bool aSuccess)
 {
   LOG(("PackagedAppVerifier::OnManifestVerified: %d", aSuccess));
 
@@ -175,27 +206,44 @@ PackagedAppVerifier::OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSu
     }
   }
 
-  mListener->OnManifestVerified(aInfo, aSuccess);
+  mListener->OnVerified(true, // aIsManifest.
+                        aInfo->mURI,
+                        aInfo->mCacheEntry,
+                        aInfo->mStatusCode,
+                        aInfo->mIsLastPart,
+                        aSuccess);
 }
 
 void
-PackagedAppVerifier::OnResourceVerified(const ResourceCacheInfo& aInfo, bool aSuccess)
+PackagedAppVerifier::OnResourceVerified(const ResourceCacheInfo* aInfo, bool aSuccess)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread(),
                      "PackagedAppVerifier::OnResourceVerified must be on main thread");
-  mListener->OnResourceVerified(aInfo, aSuccess);
+
+  mListener->OnVerified(false, // aIsManifest.
+                        aInfo->mURI,
+                        aInfo->mCacheEntry,
+                        aInfo->mStatusCode,
+                        aInfo->mIsLastPart,
+                        aSuccess);
 }
 
-nsCString
-PackagedAppVerifier::GetPackageOrigin() const
+//---------------------------------------------------------------
+// nsIPackagedAppVerifier.
+//---------------------------------------------------------------
+
+NS_IMETHODIMP
+PackagedAppVerifier::GetPackageOrigin(nsACString& aPackageOrigin)
 {
-  return mPackageOrigin;
+  aPackageOrigin = mPackageOrigin;
+  return NS_OK;
 }
 
-bool
-PackagedAppVerifier::IsPackageSigned() const
+NS_IMETHODIMP
+PackagedAppVerifier::GetIsPackageSigned(bool* aIsPackagedSigned)
 {
-  return mIsPackageSigned;
+  *aIsPackagedSigned = mIsPackageSigned;
+  return NS_OK;
 }
 
 } // namespace net

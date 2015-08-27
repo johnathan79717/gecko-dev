@@ -12,7 +12,7 @@
 #include "nsICacheStorage.h"
 #include "PackagedAppVerifier.h"
 #include "nsIMultiPartChannel.h"
-#include "nsAutoPtr.h"
+#include "PackagedAppVerifier.h"
 
 namespace mozilla {
 namespace net {
@@ -97,8 +97,11 @@ private:
   // NotifyPackageDownloaded(packageURI), so the service releases the ref.
   class PackagedAppDownloader final
     : public nsIStreamListener
-    , public PackagedAppVerifierListener
+    , public nsIPackagedAppVerifierListener
   {
+  public:
+    typedef PackagedAppVerifier::ResourceCacheInfo ResourceCacheInfo;
+
   private:
     enum EErrorType {
       ERROR_MANIFEST_VERIFIED_FAILED,
@@ -109,6 +112,7 @@ private:
     NS_DECL_ISUPPORTS
     NS_DECL_NSISTREAMLISTENER
     NS_DECL_NSIREQUESTOBSERVER
+    NS_DECL_NSIPACKAGEDAPPVERIFIERLISTENER
 
     // Initializes mCacheStorage and saves aKey as mPackageKey which is later
     // used to remove this object from PackagedAppService::mDownloadingPackages
@@ -148,8 +152,8 @@ private:
     //---------------------------------------------------------------
     // For PackagedAppVerifierListener.
     //---------------------------------------------------------------
-    virtual void OnManifestVerified(const ResourceCacheInfo& aInfo, bool aSuccess);
-    virtual void OnResourceVerified(const ResourceCacheInfo& aInfo, bool aSuccess);
+    virtual void OnManifestVerified(const ResourceCacheInfo* aInfo, bool aSuccess);
+    virtual void OnResourceVerified(const ResourceCacheInfo* aInfo, bool aSuccess);
 
     // Handle all kinds of error during package downloading.
     void OnError(EErrorType aError);
@@ -201,7 +205,7 @@ private:
     bool mIsFromCache;
 
     // Deal with verification and delegate callbacks to the downloader.
-    nsAutoPtr<PackagedAppVerifier> mVerifier;
+    nsRefPtr<PackagedAppVerifier> mVerifier;
 
     // The package origin without signed package origin identifier.
     // If you need the origin with the signity taken into account, use

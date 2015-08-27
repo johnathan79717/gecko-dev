@@ -207,6 +207,39 @@ GetPackageCacheEntry(nsIRequest *aRequest)
   return entry.forget();
 }
 
+// Create nsIInputStream based on the given string which doesn't have to
+// be null-terminated. Note that the string data is shared.
+static already_AddRefed<nsIInputStream>
+CreateSharedStringStream(const char* aData, uint32_t aCount)
+{
+  nsresult rv;
+  nsCOMPtr<nsIStringInputStream> stream =
+    do_CreateInstance("@mozilla.org/io/string-input-stream;1", &rv);
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
+  rv = stream->ShareData((char*)aData, aCount);
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
+  return stream.forget();
+}
+
+// Get the original HTTP response header from the request.
+static bool
+GetOriginalResponseHeader(nsIRequest* aRequest, nsACString& aHeader)
+{
+  // TODO: The flattened http header might be different from the original.
+  //       See Bug 1198669 for further information.
+
+  nsCOMPtr<nsIResponseHeadProvider> headerProvider(do_QueryInterface(aRequest));
+  nsHttpResponseHead *responseHead = headerProvider->GetResponseHead();
+  NS_ENSURE_TRUE(responseHead, false);
+
+  responseHead->Flatten(aHeader, true);
+  aHeader.Append("\r\n");
+
+  return true;
+}
+
 } // anon
 
 /* static */ nsresult
@@ -375,7 +408,9 @@ PackagedAppService::PackagedAppChannelListener::OnDataAvailable(nsIRequest *aReq
 
 ////////////////////////////////////////////////////////////////////////////////
 
-NS_IMPL_ISUPPORTS(PackagedAppService::PackagedAppDownloader, nsIStreamListener)
+NS_IMPL_ISUPPORTS(PackagedAppService::PackagedAppDownloader,
+                  nsIStreamListener,
+                  nsIPackagedAppVerifierListener)
 
 nsresult
 PackagedAppService::PackagedAppDownloader::Init(nsILoadContextInfo* aInfo,
@@ -399,32 +434,6 @@ PackagedAppService::PackagedAppDownloader::Init(nsILoadContextInfo* aInfo,
   mPackageOrigin = aPackageOrigin;
 
   return NS_OK;
-}
-
-nsresult
-PackagedAppService::PackagedAppDownloader::BeginHashComputation(nsIURI* aURI,
-                                                                nsIRequest* aRequest)
-{
-  nsCOMPtr<nsIResponseHeadProvider> headerProvider(do_QueryInterface(aRequest));
-  nsHttpResponseHead *responseHead = headerProvider->GetResponseHead();
-  if (!responseHead) {
-    LOG(("Failed to get header from the request."));
-    return NS_ERROR_FAILURE;
-  }
-
-  // Start over a new hash computation.
-  nsAutoCString uriAsAscii;
-  aURI->GetAsciiSpec(uriAsAscii);
-  mVerifier->BeginResourceHash(uriAsAscii);
-
-  // TODO: The flattened http header might be different from the original.
-  //       Bug 1198669 will add a API to nsIMultipartChannel to get the original
-  //       http header.
-  nsAutoCString head;
-  responseHead->Flatten(head, true);
-  head.Append("\r\n");
-
-  return mVerifier->UpdateResourceHash((const uint8_t*)head.get(), head.Length());
 }
 
 void
@@ -474,9 +483,16 @@ PackagedAppService::PackagedAppDownloader::OnStartRequest(nsIRequest *aRequest,
   NS_WARN_IF(NS_FAILED(rv));
 
   EnsureVerifier(aRequest);
-  BeginHashComputation(uri, aRequest);
+  mVerifier->OnStartRequest(nullptr, uri);
 
-  return NS_OK;
+  // Since the header is considered as a part of the streaming data,
+  // we need to feed the header as data to the verifier.
+  nsCString header;
+  if (!GetOriginalResponseHeader(aRequest, header)) {
+    return NS_ERROR_FAILURE;
+  }
+  nsCOMPtr<nsIInputStream> stream = CreateSharedStringStream(header.get(), header.Length());
+  return mVerifier->OnDataAvailable(nullptr, nullptr, stream, 0, header.Length());
 }
 
 nsresult
@@ -626,8 +642,6 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
 
   // We've got a resource downloaded. Finalize this resource cache and delegate to
   // PackagedAppVerifier rather than serving this resource right away.
-
-  mVerifier->EndResourceHash();
   mWriter->OnStopRequest(aRequest, aContext, aStatusCode);
 
   nsCOMPtr<nsIURI> uri;
@@ -644,8 +658,10 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
 
   // The downloader only needs to focus on PackagedAppVerifierListener callback.
   // The PackagedAppVerifier would handle the manifest/resource verification.
-  ResourceCacheInfo info(uri, entry, aStatusCode, lastPart);
-  mVerifier->ProcessResourceCache(info);
+  nsRefPtr<ResourceCacheInfo> info =
+    new ResourceCacheInfo(uri, entry, aStatusCode, lastPart);
+
+  mVerifier->OnStopRequest(nullptr, info, aStatusCode);
 
   return NS_OK;
 }
@@ -671,7 +687,8 @@ PackagedAppService::PackagedAppDownloader::ConsumeData(nsIInputStream *aStream,
     return NS_OK;
   }
 
-  self->mVerifier->UpdateResourceHash((const uint8_t*)aFromRawSegment, aCount);
+  nsCOMPtr<nsIInputStream> stream = CreateSharedStringStream(aFromRawSegment, aCount);
+  self->mVerifier->OnDataAvailable(nullptr, nullptr, stream, 0, aCount);
 
   return self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
 }
@@ -835,11 +852,27 @@ void PackagedAppService::PackagedAppDownloader::InstallSignedPackagedApp()
 }
 
 //------------------------------------------------------------------
-// PackagedAppVerifierListener
+// nsIPackagedAppVerifierListener
 //------------------------------------------------------------------
+NS_IMETHODIMP
+PackagedAppService::PackagedAppDownloader::OnVerified(bool aIsManifest,
+                                                      nsIURI* aUri,
+                                                      nsICacheEntry* aCacheEntry,
+                                                      nsresult aStatusCode,
+                                                      bool aIsLastPart,
+                                                      bool aVerificationSuccess)
+{
+  RefPtr<ResourceCacheInfo> info =
+    new ResourceCacheInfo(aUri, aCacheEntry, aStatusCode, aIsLastPart);
+
+  aIsManifest ? OnManifestVerified(info, aVerificationSuccess)
+              : OnResourceVerified(info, aVerificationSuccess);
+
+  return NS_OK;
+}
 
 void
-PackagedAppService::PackagedAppDownloader::OnManifestVerified(const ResourceCacheInfo& aInfo,
+PackagedAppService::PackagedAppDownloader::OnManifestVerified(const ResourceCacheInfo* aInfo,
                                                               bool aSuccess)
 {
   if (!aSuccess) {
@@ -848,20 +881,24 @@ PackagedAppService::PackagedAppDownloader::OnManifestVerified(const ResourceCach
   }
 
   // TODO: If we disallow the request for the manifest file, do NOT callback here.
-  CallCallbacks(aInfo.mURI, aInfo.mCacheEntry, aInfo.mStatusCode);
+  CallCallbacks(aInfo->mURI, aInfo->mCacheEntry, aInfo->mStatusCode);
 
-  if (!mVerifier->IsPackageSigned()) {
+  bool isPackagedSigned;
+  mVerifier->GetIsPackageSigned(&isPackagedSigned);
+  if (!isPackagedSigned) {
     // A verified but unsigned manifest means this package has no signature.
     LOG(("No signature in the package. Just run normally."));
     return;
   }
 
-  NotifyOnStartSignedPackageRequest(mVerifier->GetPackageOrigin());
+  nsCString packageOrigin;
+  mVerifier->GetPackageOrigin(packageOrigin);
+  NotifyOnStartSignedPackageRequest(packageOrigin);
   InstallSignedPackagedApp();
 }
 
 void
-PackagedAppService::PackagedAppDownloader::OnResourceVerified(const ResourceCacheInfo& aInfo,
+PackagedAppService::PackagedAppDownloader::OnResourceVerified(const ResourceCacheInfo* aInfo,
                                                               bool aSuccess)
 {
   if (!aSuccess) {
@@ -869,11 +906,11 @@ PackagedAppService::PackagedAppDownloader::OnResourceVerified(const ResourceCach
   }
 
   // Serve this resource to all listeners.
-  CallCallbacks(aInfo.mURI, aInfo.mCacheEntry, aInfo.mStatusCode);
+  CallCallbacks(aInfo->mURI, aInfo->mCacheEntry, aInfo->mStatusCode);
 
-  if (aInfo.mIsLastPart) {
-    LOG(("This is the last part. FinalizeDownload (%d)", aInfo.mStatusCode));
-    FinalizeDownload(aInfo.mStatusCode);
+  if (aInfo->mIsLastPart) {
+    LOG(("This is the last part. FinalizeDownload (%d)", aInfo->mStatusCode));
+    FinalizeDownload(aInfo->mStatusCode);
   }
 }
 
