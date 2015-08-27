@@ -50,7 +50,7 @@
 
 // service implementing nsIProxyAutoConfig.
 #define NS_PROXYAUTOCONFIG_CONTRACTID \
-    "@mozilla.org/network/proxy-auto-config;1" 
+    "@mozilla.org/network/proxy-auto-config;1"
 #define NS_PROXYAUTOCONFIG_CID                       \
 { /* 63ac8c66-1dd2-11b2-b070-84d00d3eaece */         \
     0x63ac8c66,                                      \
@@ -827,7 +827,7 @@
  * netwerk/mime classes
  */
 
-// {1F4DBCF7-245C-4c8c-943D-8A1DA0495E8A} 
+// {1F4DBCF7-245C-4c8c-943D-8A1DA0495E8A}
 #define NS_MIMEHEADERPARAM_CID                         \
 {   0x1f4dbcf7,                                        \
     0x245c,                                            \
@@ -906,6 +906,15 @@
   { 0xa0, 0x6a, 0xdc, 0x29, 0xcf, 0x8d, 0xe3, 0x81 }   \
 }
 
+#define NS_PACKAGEDAPPVERIFIER_CONTRACTID \
+    "@mozilla.org/network/packaged-app-verifier;1"
+#define NS_PACKAGEDAPPVERIFIER_CID                      \
+{   /* 07242d20-4cae-11e5-b970-0800200c9a66 */         \
+    0x07242d20,                                        \
+    0x4cae,                                            \
+    0x11e5,                                            \
+  { 0xb9, 0x70, 0x08, 0x00, 0x20, 0x0c, 0x96, 0x66 }   \
+}
 
 /******************************************************************************
  * netwerk/cookie classes

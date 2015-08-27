@@ -35,6 +35,7 @@ EXPORTS.mozilla.net += [
     'HttpInfo.h',
     'NullHttpChannel.h',
     'PackagedAppService.h',
+    'PackagedAppVerifier.h',
     'PHttpChannelParams.h',
     'PSpdyPush.h',
     'TimingStruct.h',

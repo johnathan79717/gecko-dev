@@ -1,0 +1,383 @@
+//
+// This file tests the packaged app service - nsIPackagedAppService
+// NOTE: The order in which tests are run is important
+//       If you need to add more tests, it's best to define them at the end
+//       of the file and to add them at the end of run_test
+//
+// ----------------------------------------------------------------------------
+//
+// test_bad_args
+//     - checks that calls to nsIPackagedAppService::GetResource do not accept a null argument
+// test_callback_gets_called
+//     - checks the regular use case -> requesting a resource should asynchronously return an entry
+// test_same_content
+//     - makes another request for the same file, and checks that the same content is returned
+// test_request_number
+//     - this test does not make a request, but checks that the package has only
+//       been requested once. The entry returned by the call to getResource in
+//       test_same_content should be returned from the cache.
+//
+// test_package_does_not_exist
+//     - checks that requesting a file from a <package that does not exist>
+//       calls the listener with an error code
+// test_file_does_not_exist
+//     - checks that requesting a <subresource that doesn't exist> inside a
+//       package calls the listener with an error code
+//
+// test_bad_package
+//    - tests that a package with missing headers for some of the files
+//      will still return files that are correct
+// test_bad_package_404
+//    - tests that a request for a missing subresource doesn't hang if
+//      if the last file in the package is missing some headers
+
+Cu.import('resource://gre/modules/LoadContextInfo.jsm');
+Cu.import("resource://testing-common/httpd.js");
+Cu.import("resource://gre/modules/Services.jsm");
+
+// The number of times this package has been requested
+// This number might be reset by tests that use it
+var packagedAppRequestsMade = 0;
+// The default content handler. It just responds by sending the package data
+// with an application/package content type
+function packagedAppContentHandler(metadata, response)
+{
+  packagedAppRequestsMade++;
+  if (packagedAppRequestsMade == 2) {
+    // The second request returns a 304 not modified response
+    response.setStatusLine(metadata.httpVersion, 304, "Not Modified");
+    response.bodyOutputStream.write("", 0);
+    return;
+  }
+  response.setHeader("Content-Type", 'application/package');
+  var body = testData.getData();
+
+  if (packagedAppRequestsMade == 3) {
+    // The third request returns a 200 OK response with a slightly different content
+    body = body.replace(/\.\.\./g, 'xxx');
+  }
+  response.bodyOutputStream.write(body, body.length);
+}
+
+function getPrincipal(url) {
+  let uri = createURI(url);
+  return Components.classes["@mozilla.org/scriptsecuritymanager;1"]
+         .getService(Ci.nsIScriptSecurityManager)
+         .getNoAppCodebasePrincipal(uri);
+}
+
+// The package content
+// getData formats it as described at http://www.w3.org/TR/web-packaging/#streamable-package-format
+var testData = {
+  content: [
+   { headers: ["Content-Location: /index.html", "Content-Type: text/html"], data: "<html>\r\n  <head>\r\n    <script src=\"/scripts/app.js\"></script>\r\n    ...\r\n  </head>\r\n  ...\r\n</html>\r\n", type: "text/html" },
+   { headers: ["Content-Location: /scripts/app.js", "Content-Type: text/javascript"], data: "module Math from '/scripts/helpers/math.js';\r\n...\r\n", type: "text/javascript" },
+   { headers: ["Content-Location: /scripts/helpers/math.js", "Content-Type: text/javascript"], data: "export function sum(nums) { ... }\r\n...\r\n", type: "text/javascript" }
+  ],
+  token : "gc0pJq0M:08jU534c0p",
+  getData: function() {
+    var str = "";
+    for (var i in this.content) {
+      str += "--" + this.token + "\r\n";
+      for (var j in this.content[i].headers) {
+        str += this.content[i].headers[j] + "\r\n";
+      }
+      str += "\r\n";
+      str += this.content[i].data + "\r\n";
+    }
+
+    str += "--" + this.token + "--";
+    return str;
+  }
+}
+
+XPCOMUtils.defineLazyGetter(this, "uri", function() {
+  return "http://localhost:" + httpserver.identity.primaryPort;
+});
+
+// The active http server initialized in run_test
+var httpserver = null;
+// The packaged app service initialized in run_test
+var paservice = null;
+// This variable is set before getResource is called. The listener uses this variable
+// to check the correct resource path for the returned entry
+var packagePath = null;
+
+////////////////////////////////////////////////////////////////
+let ioService = Cc["@mozilla.org/network/io-service;1"]
+                .getService(Ci.nsIIOService);
+
+let gVerifier = null;
+
+let kIsManifestIdx          = 0;
+let kUriIdx                 = 1;
+let kCacheEntryIdx          = 2;
+let kStatusCodeIdx          = 3;
+let kIsLastPartIdx          = 4;
+let kVerificationSuccessIdx = 5;
+
+let verifierListener = function (aExpecetedCallback) {
+  let cnt = 0;
+  return {
+    onVerified: function(aIsManifest,
+                         aUri,
+                         aCacheEntry,
+                         aStatusCode,
+                         aIsLastPart,
+                         aVerificationSuccess) {
+      cnt++;
+
+      let expectedCallback = aExpecetedCallback[cnt];
+
+      equal(aIsManifest,          expectedCallback[kIsManifestIdx]);
+      equal(aUri.asciiSpec,       expectedCallback[kUriIdx]);
+      equal(aCacheEntry,          expectedCallback[kCacheEntryIdx]);
+      equal(aStatusCode,          expectedCallback[kStatusCodeIdx]);
+      equal(aIsLastPart,          expectedCallback[kIsLastPartIdx]);
+      equal(aVerificationSuccess, expectedCallback[kVerificationSuccessIdx]);
+
+      if (cnt >= aExpecetedCallback.length) {
+        run_next_test();
+      }
+    },
+  };
+};
+
+function test_create_verifier() {
+  gVerifier = Cc["@mozilla.org/network/packaged-app-verifier;1"]
+                     .createInstance(Ci.nsIPackagedAppVerifier);
+  ok(!!gVerifier);
+
+  gVerifier.init(gVerifierListener,
+                 'http://foo.com',
+                 '',
+                 null);
+
+  run_next_test();
+}
+
+function feedResources(aExpectedCallbacks) {
+  for (let i = 0; i < aExpectedCallbacks.length; i++) {
+    let uri = ioService.newURI(aExpectedCallbacks[kUriIdx], null, null);
+    gVerifier.onStartRequest(null, uri);
+
+    let info = gVerifier.createResourceCacheInfo(uri, null, 0, aIsLastPart);
+  }
+
+  let uri = ioService.newURI(aExpectedCallbacks[1], null, null);
+  gVerifier.onStartRequest(null, uri);
+
+  let info = gVerifier.createResourceCacheInfo(uri, null, 0, aIsLastPart);
+  gVerifier.onStopRequest(null, info, 0);
+}
+
+function test_basic() {
+  let expectedCallbacks = [
+    [true, 'http://foo.com/manifest.webapps', null, Cr.NS_OK, false],
+    [true, 'http://foo.com/1.html', null, Cr.NS_OK, false],
+    [true, 'http://foo.com/2.js', null, Cr.NS_OK, false],
+    [true, 'http://foo.com/3.jpg', null, Cr.NS_OK, false],
+    [true, 'http://foo.com/4.html', null, Cr.NS_OK, false],
+    [true, 'http://foo.com/5.css', null, Cr.NS_OK, false],
+  ];
+
+  feedResources(expectedCallbacks);
+
+
+  feedResource('http://people.mozilla.org/manifest.webapps', false);
+  feedResource('http://people.mozilla.org/first.html', false);
+  feedResource('http://people.mozilla.org/last.js', true);
+}
+
+function run_test()
+{
+  /*
+  // setup test
+  httpserver = new HttpServer();
+  httpserver.registerPathHandler("/package", packagedAppContentHandler);
+  httpserver.registerPathHandler("/304Package", packagedAppContentHandler);
+  httpserver.registerPathHandler("/badPackage", packagedAppBadContentHandler);
+  httpserver.start(-1);
+
+  paservice = Cc["@mozilla.org/network/packaged-app-service;1"]
+                     .getService(Ci.nsIPackagedAppService);
+  ok(!!paservice, "test service exists");
+
+  add_test(test_bad_args);
+
+  add_test(test_callback_gets_called);
+  add_test(test_same_content);
+  add_test(test_request_number);
+  add_test(test_updated_package);
+
+  add_test(test_package_does_not_exist);
+  add_test(test_file_does_not_exist);
+
+  add_test(test_bad_package);
+  add_test(test_bad_package_404);
+  */
+
+  add_test(test_create_verifier);
+  add_test(test_basic);
+
+  // run tests
+  run_next_test();
+}
+
+// This checks the proper metadata is on the entry
+var metadataListener = {
+  onMetaDataElement: function(key, value) {
+    if (key == 'response-head') {
+      var kExpectedResponseHead = "HTTP/1.1 200 \r\nContent-Location: /index.html\r\nContent-Type: text/html\r\n";
+      ok(0 === value.indexOf(kExpectedResponseHead), 'The cached response header not matched');
+    }
+    else if (key == 'request-method')
+      equal(value, "GET");
+    else
+      ok(false, "unexpected metadata key")
+  }
+}
+
+// A listener we use to check the proper cache entry is returned by the service
+function packagedResourceListener(content) {
+  this.content = content;
+}
+
+packagedResourceListener.prototype = {
+  QueryInterface: function (iid) {
+    if (iid.equals(Ci.nsICacheEntryOpenCallback) ||
+        iid.equals(Ci.nsISupports))
+      return this;
+    throw Cr.NS_ERROR_NO_INTERFACE;
+  },
+  onCacheEntryCheck: function() { return Ci.nsICacheEntryOpenCallback.ENTRY_WANTED; },
+  onCacheEntryAvailable: function (entry, isnew, appcache, status) {
+    equal(status, Cr.NS_OK, "status is NS_OK");
+    ok(!!entry, "Needs to have an entry");
+    equal(entry.key, uri + packagePath + "!//index.html", "Check entry has correct name");
+    entry.visitMetaData(metadataListener);
+    var inputStream = entry.openInputStream(0);
+    pumpReadStream(inputStream, (read) => {
+        inputStream.close();
+        equal(read, this.content); // not using do_check_eq since logger will fail for the 1/4MB string
+        run_next_test();
+    });
+  }
+};
+
+var cacheListener = new packagedResourceListener(testData.content[0].data);
+// ----------------------------------------------------------------------------
+
+// These calls should fail, since one of the arguments is invalid or null
+function test_bad_args() {
+  Assert.throws(() => { paservice.getResource(getPrincipal("http://test.com"), 0, LoadContextInfo.default, cacheListener); }, "url's with no !// aren't allowed");
+  Assert.throws(() => { paservice.getResource(getPrincipal("http://test.com/package!//test"), 0, LoadContextInfo.default, null); }, "should have a callback");
+  Assert.throws(() => { paservice.getResource(null, 0, LoadContextInfo.default, cacheListener); }, "should have a URI");
+  Assert.throws(() => { paservice.getResource(getPrincipal("http://test.com/package!//test"), null, cacheListener); }, "should have a LoadContextInfo");
+  run_next_test();
+}
+
+// ----------------------------------------------------------------------------
+
+// This tests that the callback gets called, and the cacheListener gets the proper content.
+function test_callback_gets_called() {
+  packagePath = "/package";
+  paservice.getResource(getPrincipal(uri + packagePath + "!//index.html"), 0, LoadContextInfo.default, cacheListener);
+}
+
+// Tests that requesting the same resource returns the same content
+function test_same_content() {
+  packagePath = "/package";
+  paservice.getResource(getPrincipal(uri + packagePath + "!//index.html"), 0, LoadContextInfo.default, cacheListener);
+}
+
+// Check the content handler has been called the expected number of times.
+function test_request_number() {
+  equal(packagedAppRequestsMade, 2, "2 requests are expected. First with content, second is a 304 not modified.");
+  run_next_test();
+}
+
+// This tests that new content is returned if the package has been updated
+function test_updated_package() {
+  packagePath = "/package";
+  paservice.getResource(getPrincipal(uri + packagePath + "!//index.html"), 0, LoadContextInfo.default,
+      new packagedResourceListener(testData.content[0].data.replace(/\.\.\./g, 'xxx')));
+}
+
+// ----------------------------------------------------------------------------
+
+// This listener checks that the requested resources are not returned
+// either because the package does not exist, or because the requested resource
+// is not contained in the package.
+var listener404 = {
+  onCacheEntryCheck: function() { return Ci.nsICacheEntryOpenCallback.ENTRY_WANTED; },
+  onCacheEntryAvailable: function (entry, isnew, appcache, status) {
+    // XXX: it returns NS_ERROR_FAILURE for a missing package
+    // and NS_ERROR_FILE_NOT_FOUND for a missing file from the package.
+    // Maybe make them both return NS_ERROR_FILE_NOT_FOUND?
+    notEqual(status, Cr.NS_OK, "NOT FOUND");
+    ok(!entry, "There should be no entry");
+    run_next_test();
+  }
+};
+
+// Tests that an error is returned for a non existing package
+function test_package_does_not_exist() {
+  packagePath = "/package_non_existent";
+  paservice.getResource(getPrincipal(uri + packagePath + "!//index.html"), 0, LoadContextInfo.default, listener404);
+}
+
+// Tests that an error is returned for a non existing resource in a package
+function test_file_does_not_exist() {
+  packagePath = "/package"; // This package exists
+  paservice.getResource(getPrincipal(uri + packagePath + "!//file_non_existent.html"), 0, LoadContextInfo.default, listener404);
+}
+
+// ----------------------------------------------------------------------------
+
+// Broken package. The first and last resources do not contain a "Content-Location" header
+// and should be ignored.
+var badTestData = {
+  content: [
+   { headers: ["Content-Type: text/javascript"], data: "module Math from '/scripts/helpers/math.js';\r\n...\r\n", type: "text/javascript" },
+   { headers: ["Content-Location: /index.html", "Content-Type: text/html"], data: "<html>\r\n  <head>\r\n    <script src=\"/scripts/app.js\"></script>\r\n    ...\r\n  </head>\r\n  ...\r\n</html>\r\n", type: "text/html" },
+   { headers: ["Content-Type: text/javascript"], data: "export function sum(nums) { ... }\r\n...\r\n", type: "text/javascript" }
+  ],
+  token : "gc0pJq0M:08jU534c0p",
+  getData: function() {
+    var str = "";
+    for (var i in this.content) {
+      str += "--" + this.token + "\r\n";
+      for (var j in this.content[i].headers) {
+        str += this.content[i].headers[j] + "\r\n";
+      }
+      str += "\r\n";
+      str += this.content[i].data + "\r\n";
+    }
+
+    str += "--" + this.token + "--";
+    return str;
+  }
+}
+
+// Returns the content of the package with "Content-Location" headers missing for the first and last resource
+function packagedAppBadContentHandler(metadata, response)
+{
+  response.setHeader("Content-Type", 'application/package');
+  var body = badTestData.getData();
+  response.bodyOutputStream.write(body, body.length);
+}
+
+// Checks that the resource with the proper headers inside the bad package is still returned
+function test_bad_package() {
+  packagePath = "/badPackage";
+  paservice.getResource(getPrincipal(uri + packagePath + "!//index.html"), 0, LoadContextInfo.default, cacheListener);
+}
+
+// Checks that the request for a non-existent resource doesn't hang for a bad package
+function test_bad_package_404() {
+  packagePath = "/badPackage";
+  paservice.getResource(getPrincipal(uri + packagePath + "!//file_non_existent.html"), 0, LoadContextInfo.default, listener404);
+}
+
+// ----------------------------------------------------------------------------

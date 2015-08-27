@@ -23,11 +23,9 @@ namespace net {
 
 static PackagedAppService *gPackagedAppService = nullptr;
 
-static PRLogModuleInfo *gPASLog = nullptr;
+PRLogModuleInfo *gPASLog = nullptr;
 #undef LOG
 #define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
-
-static bool gDeveloperMode = false;
 
 NS_IMPL_ISUPPORTS(PackagedAppService, nsIPackagedAppService)
 
@@ -452,8 +450,7 @@ PackagedAppService::PackagedAppDownloader::EnsureVerifier(nsIRequest *aRequest)
   mVerifier = new PackagedAppVerifier(this,
                                       mPackageOrigin,
                                       signature,
-                                      packageCacheEntry,
-                                      gDeveloperMode);
+                                      packageCacheEntry);
 }
 
 NS_IMETHODIMP
@@ -585,6 +582,8 @@ PackagedAppService::PackagedAppDownloader::FinalizeDownload(nsresult aStatusCode
     gPackagedAppService->NotifyPackageDownloaded(mPackageKey);
   }
   ClearCallbacks(aStatusCode);
+
+  mVerifier = nullptr;
 }
 
 nsCString
@@ -922,7 +921,7 @@ PackagedAppService::PackagedAppService()
   gPASLog = PR_NewLogModule("PackagedAppService");
   LOG(("[%p] Created PackagedAppService\n", this));
 
-  Preferences::AddBoolVarCache(&gDeveloperMode,
+  Preferences::AddBoolVarCache(&PackagedAppVerifier::sDeveloperMode,
                                "network.http.packaged-apps-developer-mode", false);
 }
 

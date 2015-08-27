@@ -14,6 +14,9 @@
 #include "nsITimer.h"
 #include "nsIPackagedAppVerifier.h"
 
+extern PRLogModuleInfo *gPASLog;
+#define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
+
 static const short kResourceHashType = nsICryptoHash::SHA256;
 static const char* kTestingSignature = "THIS.IS.TESTING.SIGNATURE";
 
@@ -27,24 +30,41 @@ NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier)
 NS_IMPL_ISUPPORTS(PackagedAppVerifier::ResourceCacheInfo, nsISupports)
 
 const char* PackagedAppVerifier::kSignedPakOriginMetadataKey = "signed-pak-origin";
+bool PackagedAppVerifier::sDeveloperMode = false;
+
+PackagedAppVerifier::PackagedAppVerifier()
+{
+  Init(nullptr, EmptyCString(), EmptyCString(), nullptr);
+}
 
 PackagedAppVerifier::PackagedAppVerifier(nsIPackagedAppVerifierListener* aListener,
                                          const nsACString& aPackageOrigin,
                                          const nsACString& aSignature,
-                                         nsICacheEntry* aPackageCacheEntry,
-                                         bool aDeveloperMode)
-  : mListener(aListener)
-  , mState(STATE_UNKNOWN)
-  , mPackageOrigin(aPackageOrigin)
-  , mSignature(aSignature)
-  , mIsPackageSigned(false)
-  , mPackageCacheEntry(aPackageCacheEntry)
-  , mDeveloperMode(aDeveloperMode)
+                                         nsICacheEntry* aPackageCacheEntry)
 {
-  if (mDeveloperMode && mSignature.IsEmpty()) {
+  Init(aListener, aPackageOrigin, aSignature, aPackageCacheEntry);
+}
+
+NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListener,
+                                        const nsACString& aPackageOrigin,
+                                        const nsACString& aSignature,
+                                        nsICacheEntry* aPackageCacheEntry)
+{
+  gPASLog = PR_NewLogModule("PackagedAppService");
+
+  mListener = aListener;
+  mState = STATE_UNKNOWN;
+  mPackageOrigin = aPackageOrigin;
+  mSignature = aSignature;
+  mIsPackageSigned = false;
+  mPackageCacheEntry = aPackageCacheEntry;
+
+  if (sDeveloperMode && mSignature.IsEmpty()) {
     LOG(("No signature but in developer mode ==> Assign a testing signature."));
     mSignature.Assign(kTestingSignature);
   }
+
+  return NS_OK;
 }
 
 //----------------------------------------------------------------------
@@ -141,7 +161,7 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
 
   LOG(("Ready to verify manifest."));
 
-  if (mDeveloperMode) {
+  if (sDeveloperMode) {
     LOG(("Developer mode! Bypass verification."));
     OnManifestVerified(aInfo, true);
     return;
@@ -165,7 +185,7 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
 
   LOG(("Checking the resource integrity. '%s'", mLastComputedResourceHash.get()));
 
-  if (mDeveloperMode) {
+  if (sDeveloperMode) {
     LOG(("Developer mode! Bypass integrity check."));
     OnResourceVerified(aInfo, true);
     return;
@@ -212,6 +232,8 @@ PackagedAppVerifier::OnManifestVerified(const ResourceCacheInfo* aInfo, bool aSu
                         aInfo->mStatusCode,
                         aInfo->mIsLastPart,
                         aSuccess);
+
+  LOG(("PackagedAppVerifier::OnManifestVerified done"));
 }
 
 void
@@ -245,6 +267,23 @@ PackagedAppVerifier::GetIsPackageSigned(bool* aIsPackagedSigned)
   *aIsPackagedSigned = mIsPackageSigned;
   return NS_OK;
 }
+
+NS_IMETHODIMP
+PackagedAppVerifier::CreateResourceCacheInfo(nsIURI* aUri,
+                                             nsICacheEntry* aCacheEntry,
+                                             nsresult aStatusCode,
+                                             bool aIsLastPart,
+                                             nsISupports** aReturn)
+{
+  RefPtr<ResourceCacheInfo> info =
+    new ResourceCacheInfo(aUri, aCacheEntry, aStatusCode, aIsLastPart);
+
+  *aReturn = info;
+
+  NS_IF_ADDREF(*aReturn);
+  return NS_OK;
+}
+
 
 } // namespace net
 } // namespace mozilla

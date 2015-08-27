@@ -8,11 +8,12 @@
 
 interface nsIURI;
 interface nsICacheEntry;
+interface nsIPackagedAppVerifierListener;
 
 /**
  * nsIPackagedAppVerifier
  */
-[scriptable, builtinclass, uuid(f7611bd0-4c96-11e5-b970-0800200c9a66)]
+[scriptable, uuid(16419a80-4cc3-11e5-b970-0800200c9a66)]
 interface nsIPackagedAppVerifier : nsIStreamListener
 {
   // The package origin of either signed or unsigned package.
@@ -20,12 +21,22 @@ interface nsIPackagedAppVerifier : nsIStreamListener
 
   // Whether this package is signed.
   readonly attribute boolean isPackageSigned;
+
+  void init(in nsIPackagedAppVerifierListener aListener,
+            in ACString aPackageOrigin,
+            in ACString aSignature,
+            in nsICacheEntry aPackageCacheEntry);
+
+  nsISupports createResourceCacheInfo(in nsIURI aUri,
+                                      in nsICacheEntry aCacheEntry,
+                                      in nsresult aStatusCode,
+                                      in boolean aIsLastPart);
 };
 
 /**
  * nsIPackagedAppVerifierListener
  */
-[scriptable, builtinclass, uuid(00a78760-4c97-11e5-b970-0800200c9a66)]
+[scriptable, uuid(092eba70-4cbf-11e5-b970-0800200c9a66)]
 interface nsIPackagedAppVerifierListener : nsISupports
 {
   void onVerified(in boolean aIsManifest,

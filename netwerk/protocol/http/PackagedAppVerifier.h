@@ -27,6 +27,11 @@ public:
   NS_DECL_NSIPACKAGEDAPPVERIFIER
 
 public:
+  // If it's true, all the verification will be skipped and the package will
+  // be treated signed.
+  static bool sDeveloperMode;
+
+public:
   enum EState {
     // The initial state.
     STATE_UNKNOWN,
@@ -70,11 +75,12 @@ public:
   };
 
 public:
+  PackagedAppVerifier();
+
   PackagedAppVerifier(nsIPackagedAppVerifierListener* aListener,
                       const nsACString& aPackageOrigin,
                       const nsACString& aSignature,
-                      nsICacheEntry* aPackageCacheEntry,
-                      bool aDeveloperMode = false);
+                      nsICacheEntry* aPackageCacheEntry);
 
   static const char* kSignedPakOriginMetadataKey;
 
@@ -103,9 +109,7 @@ private:
   void OnResourceVerified(const ResourceCacheInfo* aInfo, bool aSuccess);
 
   // To notify that either manifest or resource check is done.
-  // Needs to be weak to avoid cross reference between PackagedApoVerifier
-  // and PackagedAppDownloader.
-  nsIPackagedAppVerifierListener* mListener;
+  nsCOMPtr<nsIPackagedAppVerifierListener> mListener;
 
   // The internal verification state.
   EState mState;
@@ -132,10 +136,6 @@ private:
   // The last computed hash value for a resource. It will be set on every
   // |EndResourceHash| call.
   nsCString mLastComputedResourceHash;
-
-  // If it's true, all the verification will be skipped and the package will
-  // be treated signed.
-  bool mDeveloperMode;
 }; // class PackagedAppVerifier
 
 } // namespace net
