@@ -362,8 +362,8 @@ PackagedAppService::PackagedAppChannelListener::OnStartRequest(nsIRequest *aRequ
   mDownloader->SetIsFromCache(isFromCache);
   LOG(("[%p] Downloader isFromCache: %d\n", mDownloader.get(), isFromCache));
 
-  // If the package is loaded from cache, we can check 'isSigned' right now and
-  // notify all requesters immediately.
+  // If the package is loaded from cache, check the meta data in the cache
+  // to know if it's a signed package. Notify requesters if it's signed.
   if (isFromCache) {
     bool isPackageSigned = false;
     nsCString signedPackageOrigin;
@@ -630,7 +630,7 @@ PackagedAppService::PackagedAppDownloader::OnStopRequest(nsIRequest *aRequest,
   if (!multiChannel || !mWriter) {
     LOG(("Either the package was loaded from cache or malformed"));
     if (lastPart) {
-      // Two possibilities to get here:
+      // Chances to get here:
       //   1) Very likely the package has been cached or
       //   2) Less likely the package is malformed.
       FinalizeDownload(aStatusCode);
@@ -687,10 +687,10 @@ PackagedAppService::PackagedAppDownloader::ConsumeData(nsIInputStream *aStream,
     return NS_OK;
   }
 
-  nsCOMPtr<nsIInputStream> stream = CreateSharedStringStream(aFromRawSegment, aCount);
-  self->mVerifier->OnDataAvailable(nullptr, nullptr, stream, 0, aCount);
+  self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
 
-  return self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
+  nsCOMPtr<nsIInputStream> stream = CreateSharedStringStream(aFromRawSegment, aCount);
+  return self->mVerifier->OnDataAvailable(nullptr, nullptr, stream, 0, aCount);
 }
 
 NS_IMETHODIMP
