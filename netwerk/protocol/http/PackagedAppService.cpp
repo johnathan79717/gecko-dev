@@ -16,7 +16,6 @@
 #include "mozilla/Logging.h"
 #include "mozilla/DebugOnly.h"
 #include "nsIHttpHeaderVisitor.h"
-#include "mozilla/Preferences.h"
 
 namespace mozilla {
 namespace net {
@@ -920,9 +919,6 @@ PackagedAppService::PackagedAppService()
   gPackagedAppService = this;
   gPASLog = PR_NewLogModule("PackagedAppService");
   LOG(("[%p] Created PackagedAppService\n", this));
-
-  Preferences::AddBoolVarCache(&PackagedAppVerifier::sDeveloperMode,
-                               "network.http.packaged-apps-developer-mode", false);
 }
 
 PackagedAppService::~PackagedAppService()

@@ -13,12 +13,17 @@
 #include "PackagedAppVerifier.h"
 #include "nsITimer.h"
 #include "nsIPackagedAppVerifier.h"
+#include "mozilla/Preferences.h"
 
 extern PRLogModuleInfo *gPASLog;
 #define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
 
 static const short kResourceHashType = nsICryptoHash::SHA256;
 static const char* kTestingSignature = "THIS.IS.TESTING.SIGNATURE";
+
+// If it's true, all the verification will be skipped and the package will
+// be treated signed.
+static bool gDeveloperMode = false;
 
 namespace mozilla {
 namespace net {
@@ -30,10 +35,18 @@ NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier)
 NS_IMPL_ISUPPORTS(PackagedAppVerifier::ResourceCacheInfo, nsISupports)
 
 const char* PackagedAppVerifier::kSignedPakOriginMetadataKey = "signed-pak-origin";
-bool PackagedAppVerifier::sDeveloperMode = false;
 
 PackagedAppVerifier::PackagedAppVerifier()
 {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread(),
+                     "PackagedAppVerifier::OnResourceVerified must be on main thread");
+
+  static bool onceThru = false;
+  if (!onceThru) {
+      Preferences::AddBoolVarCache(&gDeveloperMode,
+                                   "network.http.packaged-apps-developer-mode", false);
+  }
+
   Init(nullptr, EmptyCString(), EmptyCString(), nullptr);
 }
 
@@ -59,7 +72,7 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
   mIsPackageSigned = false;
   mPackageCacheEntry = aPackageCacheEntry;
 
-  if (sDeveloperMode && mSignature.IsEmpty()) {
+  if (gDeveloperMode && mSignature.IsEmpty()) {
     LOG(("No signature but in developer mode ==> Assign a testing signature."));
     mSignature.Assign(kTestingSignature);
   }
@@ -161,7 +174,7 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
 
   LOG(("Ready to verify manifest."));
 
-  if (sDeveloperMode) {
+  if (gDeveloperMode) {
     LOG(("Developer mode! Bypass verification."));
     OnManifestVerified(aInfo, true);
     return;
@@ -185,7 +198,7 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
 
   LOG(("Checking the resource integrity. '%s'", mLastComputedResourceHash.get()));
 
-  if (sDeveloperMode) {
+  if (gDeveloperMode) {
     LOG(("Developer mode! Bypass integrity check."));
     OnResourceVerified(aInfo, true);
     return;

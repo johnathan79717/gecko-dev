@@ -27,11 +27,6 @@ public:
   NS_DECL_NSIPACKAGEDAPPVERIFIER
 
 public:
-  // If it's true, all the verification will be skipped and the package will
-  // be treated signed.
-  static bool sDeveloperMode;
-
-public:
   enum EState {
     // The initial state.
     STATE_UNKNOWN,
