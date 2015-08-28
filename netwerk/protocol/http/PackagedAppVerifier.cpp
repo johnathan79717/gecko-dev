@@ -41,12 +41,6 @@ PackagedAppVerifier::PackagedAppVerifier()
   MOZ_RELEASE_ASSERT(NS_IsMainThread(),
                      "PackagedAppVerifier::OnResourceVerified must be on main thread");
 
-  static bool onceThru = false;
-  if (!onceThru) {
-      Preferences::AddBoolVarCache(&gDeveloperMode,
-                                   "network.http.packaged-apps-developer-mode", false);
-  }
-
   Init(nullptr, EmptyCString(), EmptyCString(), nullptr);
 }
 
@@ -63,6 +57,13 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
                                         const nsACString& aSignature,
                                         nsICacheEntry* aPackageCacheEntry)
 {
+  static bool onceThru = false;
+  if (!onceThru) {
+    Preferences::AddBoolVarCache(&gDeveloperMode,
+                                 "network.http.packaged-apps-developer-mode", false);
+    onceThru = true;
+  }
+
   gPASLog = PR_NewLogModule("PackagedAppService");
 
   mListener = aListener;

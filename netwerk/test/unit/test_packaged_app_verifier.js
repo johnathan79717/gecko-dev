@@ -27,12 +27,17 @@ let gPrefs = Cc["@mozilla.org/preferences-service;1"]
                .getService(Components.interfaces.nsIPrefBranch);
 
 let gVerifier = Cc["@mozilla.org/network/packaged-app-verifier;1"]
-                  .createInstance(Ci.nsIPackagedAppVerifier);;
+                  .createInstance(Ci.nsIPackagedAppVerifier);
+
+let gCacheStorageService = Cc["@mozilla.org/netwerk/cache-storage-service;1"]
+                             .getService(Ci.nsICacheStorageService);;
+
+let gLoadContextInfoFactory =
+  Cu.import("resource://gre/modules/LoadContextInfo.jsm", {}).LoadContextInfo;
 
 const kUriIdx                 = 0;
-const kCacheEntryIdx          = 1;
-const kStatusCodeIdx          = 2;
-const kVerificationSuccessIdx = 3;
+const kStatusCodeIdx          = 1;
+const kVerificationSuccessIdx = 2;
 
 function enable_developer_mode()
 {
@@ -46,8 +51,10 @@ function reset_developer_mode()
 
 function createVerifierListener(aExpecetedCallbacks,
                                 aExpectedOrigin,
-                                aExpectedIsSigned) {
+                                aExpectedIsSigned,
+                                aPackageCacheEntry) {
   let cnt = 0;
+
   return {
     onVerified: function(aIsManifest,
                          aUri,
@@ -61,16 +68,24 @@ function createVerifierListener(aExpecetedCallbacks,
       let isManifest = (cnt === 1);
       let isLastPart = (cnt === aExpecetedCallbacks.length);
 
-      equal(aIsManifest,          isManifest);
-      equal(aUri.asciiSpec,       expectedCallback[kUriIdx]);
-      equal(aCacheEntry,          expectedCallback[kCacheEntryIdx]);
-      equal(aStatusCode,          expectedCallback[kStatusCodeIdx]);
-      equal(aIsLastPart,          isLastPart);
-      equal(aVerificationSuccess, expectedCallback[kVerificationSuccessIdx]);
+      // Check if we are called back with correct info.
+      equal(aIsManifest, isManifest, 'is manifest');
+      equal(aUri.asciiSpec, expectedCallback[kUriIdx], 'URL');
+      equal(aStatusCode, expectedCallback[kStatusCodeIdx], 'status code');
+      equal(aIsLastPart, isLastPart, 'is lastPart');
+      equal(aVerificationSuccess, expectedCallback[kVerificationSuccessIdx], 'verification result');
 
       if (isManifest) {
-        equal(gVerifier.packageOrigin, aExpectedOrigin);
-        equal(gVerifier.isPackageSigned, aExpectedIsSigned);
+        // Check if the verifier got the right package info.
+        equal(gVerifier.packageOrigin, aExpectedOrigin, 'package origin');
+        equal(gVerifier.isPackageSigned, aExpectedIsSigned, 'is package signed');
+
+        // Check if the verifier wrote the signed package origin to the cache.
+        ok(!!aPackageCacheEntry, aPackageCacheEntry.key);
+        let signePakOriginInCache = aPackageCacheEntry.getMetaDataElement('signed-pak-origin');
+        equal(signePakOriginInCache,
+              (aExpectedIsSigned ? aExpectedOrigin : ''),
+              'signed-pak-origin in cache');
       }
 
       if (isLastPart) {
@@ -89,9 +104,21 @@ function feedResources(aExpectedCallbacks) {
     let uri = gIoService.newURI(expectedCallback[kUriIdx], null, null);
     gVerifier.onStartRequest(null, uri);
 
-    let info = gVerifier.createResourceCacheInfo(uri, null, 0, isLastPart);
+    let info = gVerifier.createResourceCacheInfo(uri,
+                                                 null,
+                                                 expectedCallback[kStatusCodeIdx],
+                                                 isLastPart);
+
     gVerifier.onStopRequest(null, info, expectedCallback[kStatusCodeIdx]);
   }
+}
+
+function createPackageCache(aPackageUriAsAscii, aLoadContextInfo) {
+  let cacheStorage =
+      gCacheStorageService.memoryCacheStorage(aLoadContextInfo);
+
+  let uri = gIoService.newURI(aPackageUriAsAscii, null, null);
+  return cacheStorage.openTruncate(uri, '');
 }
 
 function test_no_signature(aDeveloperMode) {
@@ -103,27 +130,35 @@ function test_no_signature(aDeveloperMode) {
   // but the verification result is always true.
 
   const expectedCallbacks = [
-  // URL                      cacheEntry     statusCode   verificationResult
-    [kOrigin + '/manifest',   null,          Cr.NS_OK,    true],
-    [kOrigin + '/1.html',     null,          Cr.NS_OK,    true],
-    [kOrigin + '/2.js',       null,          Cr.NS_OK,    true],
-    [kOrigin + '/3.jpg',      null,          Cr.NS_OK,    true],
-    [kOrigin + '/4.html',     null,          Cr.NS_OK,    true],
-    [kOrigin + '/5.css',      null,          Cr.NS_OK,    true],
+  // URL                    statusCode   verificationResult
+    [kOrigin + '/manifest', Cr.NS_OK,    true],
+    [kOrigin + '/1.html',   Cr.NS_OK,    true],
+    [kOrigin + '/2.js',     Cr.NS_OK,    true],
+    [kOrigin + '/3.jpg',    Cr.NS_OK,    true],
+    [kOrigin + '/4.html',   Cr.NS_OK,    true],
+    [kOrigin + '/5.css',    Cr.NS_OK,    true],
   ];
 
   let isPackageSigned = aDeveloperMode; // Package is always considered as signed in developer mode.
+
+  // We only require the package URL to be different in each test case.
+  let packageUriString = kOrigin + '/pak' + (aDeveloperMode ? '-dev' : '');
+
+  let packageCacheEntry =
+    createPackageCache(packageUriString, gLoadContextInfoFactory.default);
+
   let verifierListener = createVerifierListener(expectedCallbacks,
                                                 kOrigin,
-                                                isPackageSigned);
+                                                isPackageSigned,
+                                                packageCacheEntry);
 
-  gVerifier.init(verifierListener, kOrigin, '', null);
+  gVerifier.init(verifierListener, kOrigin, '', packageCacheEntry);
 
   feedResources(expectedCallbacks);
 }
 
 function test_invalid_signature(aDeveloperMode) {
-  const kOrigin = 'http://foo.com';
+  const kOrigin = 'http://bar.com';
 
   aDeveloperMode = !!aDeveloperMode;
 
@@ -134,20 +169,25 @@ function test_invalid_signature(aDeveloperMode) {
   let isPackageSigned = aDeveloperMode;   // Package is always considered as signed in developer mode.
 
   const expectedCallbacks = [
-  // URL                      cacheEntry     statusCode   verificationResult
-    [kOrigin + '/manifest',   null,          Cr.NS_OK,    verificationResult],
-    [kOrigin + '/1.html',     null,          Cr.NS_OK,    verificationResult],
-    [kOrigin + '/2.js',       null,          Cr.NS_OK,    verificationResult],
-    [kOrigin + '/3.jpg',      null,          Cr.NS_OK,    verificationResult],
-    [kOrigin + '/4.html',     null,          Cr.NS_OK,    verificationResult],
-    [kOrigin + '/5.css',      null,          Cr.NS_OK,    verificationResult],
+  // URL                      statusCode   verificationResult
+    [kOrigin + '/manifest',   Cr.NS_OK,    verificationResult],
+    [kOrigin + '/1.html',     Cr.NS_OK,    verificationResult],
+    [kOrigin + '/2.js',       Cr.NS_OK,    verificationResult],
+    [kOrigin + '/3.jpg',      Cr.NS_OK,    verificationResult],
+    [kOrigin + '/4.html',     Cr.NS_OK,    verificationResult],
+    [kOrigin + '/5.css',      Cr.NS_OK,    verificationResult],
   ];
+
+  let packageUriString = kOrigin + '/pak' + (aDeveloperMode ? '-dev' : '');
+  let packageCacheEntry =
+    createPackageCache(packageUriString, gLoadContextInfoFactory.private);
 
   let verifierListener = createVerifierListener(expectedCallbacks,
                                                 kOrigin,
-                                                isPackageSigned);
+                                                isPackageSigned,
+                                                packageCacheEntry);
 
-  gVerifier.init(verifierListener, kOrigin, 'invalid signature', null);
+  gVerifier.init(verifierListener, kOrigin, 'invalid signature', packageCacheEntry);
 
   feedResources(expectedCallbacks);
 }
@@ -166,12 +206,13 @@ function test_invalid_signature_developer_mode()
 
 function run_test()
 {
-
   ok(!!gVerifier);
 
+  // Test cases in non-developer mode.
   add_test(test_no_signature);
   add_test(test_invalid_signature);
 
+  // Test cases in developer mode.
   add_test(test_no_signature_developer_mode);
   add_test(test_invalid_signature_developer_mode);
 
