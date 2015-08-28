@@ -1224,6 +1224,9 @@ GetPKPConsoleErrorTag(uint32_t failureResult, nsAString& consoleErrorTag)
         case nsISiteSecurityService::ERROR_COULD_NOT_SAVE_STATE:
             consoleErrorTag = NS_LITERAL_STRING("PKPCouldNotSaveState");
             break;
+        case nsISiteSecurityService::ERROR_ROOT_NOT_BUILT_IN:
+            consoleErrorTag = NS_LITERAL_STRING("PKPRootNotBuiltIn");
+            break;
         default:
             consoleErrorTag = NS_LITERAL_STRING("PKPUnknownError");
             break;
@@ -2853,7 +2856,7 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
         if (mPostID == 0)
             mPostID = gHttpHandler->GenerateUniqueID();
     }
-    else if (!mRequestHead.IsGet() && !mRequestHead.IsHead()) {
+    else if (!PossiblyIntercepted() && !mRequestHead.IsGet() && !mRequestHead.IsHead()) {
         // don't use the cache for other types of requests
         return NS_OK;
     }
@@ -5203,12 +5206,6 @@ nsHttpChannel::BeginConnect()
         // by the packaged app service into the cache, and the cache entry will
         // be passed to OnCacheEntryAvailable.
 
-        // Pass the original load flags to the packaged app request.
-        uint32_t loadFlags = mLoadFlags;
-
-        mLoadFlags |= LOAD_ONLY_FROM_CACHE;
-        mLoadFlags |= LOAD_FROM_CACHE;
-        mLoadFlags &= ~VALIDATE_ALWAYS;
         nsCOMPtr<nsIPackagedAppService> pas =
             do_GetService("@mozilla.org/network/packaged-app-service;1", &rv);
         if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -5216,12 +5213,18 @@ nsHttpChannel::BeginConnect()
             return rv;
         }
 
-        nsCOMPtr<nsIPrincipal> principal = GetURIPrincipal();
-        nsCOMPtr<nsILoadContextInfo> loadInfo = GetLoadContextInfo(this);
-        rv = pas->GetResource(principal, loadFlags, loadInfo, this);
+        rv = pas->GetResource(this, this);
         if (NS_FAILED(rv)) {
             AsyncAbort(rv);
         }
+
+        // We need to alter the flags so the cache entry returned by the
+        // packaged app service is always accepted. Revalidation is handled
+        // by the service.
+        mLoadFlags |= LOAD_ONLY_FROM_CACHE;
+        mLoadFlags |= LOAD_FROM_CACHE;
+        mLoadFlags &= ~VALIDATE_ALWAYS;
+
         return rv;
     }
 
@@ -6869,6 +6872,14 @@ void
 nsHttpChannel::MarkIntercepted()
 {
     mInterceptCache = INTERCEPTED;
+}
+
+NS_IMETHODIMP
+nsHttpChannel::GetResponseSynthesized(bool* aSynthesized)
+{
+    NS_ENSURE_ARG_POINTER(aSynthesized);
+    *aSynthesized = (mInterceptCache == INTERCEPTED);
+    return NS_OK;
 }
 
 bool

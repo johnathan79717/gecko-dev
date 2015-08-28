@@ -32,6 +32,7 @@ Structure::
         hotfixVersion: <string>, // e.g. "20141211.01"
       },
       settings: {
+        addonCompatibilityCheckEnabled: <bool>, // Whether application compatibility is respected for add-ons
         blocklistEnabled: <bool>, // true on failure
         isDefaultBrowser: <bool>, // null on failure, not available on Android
         defaultSearchEngine: <string>, // e.g. "yahoo"
@@ -40,6 +41,7 @@ Structure::
           loadPath: <string>, // where the engine line is located; missing if no default
           submissionURL: <string> // missing if no default or for user-installed engines
         },
+        searchCohort: <string>, // optional, contains an identifier for any active search A/B experiments
         e10sEnabled: <bool>, // whether e10s is on, i.e. browser tabs open by default in a different process
         telemetryEnabled: <bool>, // false on failure
         isInOptoutSample: <bool>, // whether this client is part of the opt-out sample

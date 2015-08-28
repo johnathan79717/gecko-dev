@@ -80,9 +80,6 @@ TEST_SUITES = {
         'mach_command': 'mochitest',
         'kwargs': {'subsuite': 'devtools', 'test_paths': None},
     },
-    'mochitest-ipcplugins': {
-        'make_target': 'mochitest-ipcplugins',
-    },
     'mochitest-plain': {
         'mach_command': 'mochitest',
         'kwargs': {'flavor': 'plain', 'test_paths': None},
@@ -473,8 +470,9 @@ class PushToTry(MachCommandBase):
             print('ERROR please commit changes before continuing')
             sys.exit(1)
 
-        driver = self._spawn(BuildDriver)
-        driver.install_tests(remove=False)
+        if paths or tags:
+            driver = self._spawn(BuildDriver)
+            driver.install_tests(remove=False)
 
         manifests_by_flavor = at.resolve_manifests(paths=paths, tags=tags)
 

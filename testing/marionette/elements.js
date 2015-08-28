@@ -79,6 +79,8 @@ Accessibility.prototype = {
     'radio menu item',
     'option',
     'radiobutton',
+    'rowheader',
+    'switch',
     'slider',
     'spinbutton',
     'pagetab',
@@ -231,7 +233,8 @@ ElementManager.prototype = {
         delete this.seenItems[i];
       }
     }
-    let id = uuidGen.generateUUID().toString();
+    let uuid = uuidGen.generateUUID().toString();
+    let id = uuid.substring(1, uuid.length - 1);
     this.seenItems[id] = Components.utils.getWeakReference(element);
     return id;
   },

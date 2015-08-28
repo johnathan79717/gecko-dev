@@ -69,6 +69,14 @@ template <class TargetUnits, class SourceUnits>
 gfx::IntRectTyped<TargetUnits> ViewAs(const gfx::IntRectTyped<SourceUnits>& aRect, PixelCastJustification) {
   return gfx::IntRectTyped<TargetUnits>(aRect.x, aRect.y, aRect.width, aRect.height);
 }
+template <class TargetUnits, class SourceUnits>
+gfx::MarginTyped<TargetUnits> ViewAs(const gfx::MarginTyped<SourceUnits>& aMargin, PixelCastJustification) {
+  return gfx::MarginTyped<TargetUnits>(aMargin.top, aMargin.right, aMargin.bottom, aMargin.left);
+}
+template <class TargetUnits, class SourceUnits>
+gfx::IntMarginTyped<TargetUnits> ViewAs(const gfx::IntMarginTyped<SourceUnits>& aMargin, PixelCastJustification) {
+  return gfx::IntMarginTyped<TargetUnits>(aMargin.top, aMargin.right, aMargin.bottom, aMargin.left);
+}
 template <class NewTargetUnits, class OldTargetUnits, class SourceUnits>
 gfx::ScaleFactor<SourceUnits, NewTargetUnits> ViewTargetAs(
     const gfx::ScaleFactor<SourceUnits, OldTargetUnits>& aScaleFactor,
@@ -176,12 +184,12 @@ template <typename TargetUnits, typename SourceUnits>
 static Maybe<gfx::PointTyped<TargetUnits>> UntransformVector(const gfx::Matrix4x4& aTransform,
                                                     const gfx::PointTyped<SourceUnits>& aVector,
                                                     const gfx::PointTyped<SourceUnits>& aAnchor) {
-  gfx::Point4D point = aTransform.ProjectPoint(aAnchor.ToUnknownPoint() + aVector.ToUnknownPoint()) 
-    - aTransform.ProjectPoint(aAnchor.ToUnknownPoint());
-  if (!point.HasPositiveWCoord()){
+  gfx::Point4D projectedAnchor = aTransform.ProjectPoint(aAnchor.ToUnknownPoint());
+  gfx::Point4D projectedTarget = aTransform.ProjectPoint(aAnchor.ToUnknownPoint() + aVector.ToUnknownPoint());
+  if (!projectedAnchor.HasPositiveWCoord() || !projectedTarget.HasPositiveWCoord()){
     return Nothing();
   }
-  return Some(ViewAs<TargetUnits>(point.As2DPoint()));
+  return Some(ViewAs<TargetUnits>(projectedAnchor.As2DPoint() - projectedTarget.As2DPoint()));
 }
 
 } // namespace mozilla
