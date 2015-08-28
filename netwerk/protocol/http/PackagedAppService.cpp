@@ -22,7 +22,7 @@ namespace net {
 
 static PackagedAppService *gPackagedAppService = nullptr;
 
-PRLogModuleInfo *gPASLog = nullptr;
+static PRLogModuleInfo *gPASLog = nullptr;
 #undef LOG
 #define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
 

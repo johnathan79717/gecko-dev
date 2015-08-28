@@ -15,9 +15,6 @@
 #include "nsIPackagedAppVerifier.h"
 #include "mozilla/Preferences.h"
 
-extern PRLogModuleInfo *gPASLog;
-#define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
-
 static const short kResourceHashType = nsICryptoHash::SHA256;
 static const char* kTestingSignature = "THIS.IS.TESTING.SIGNATURE";
 
@@ -63,8 +60,6 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
                                  "network.http.packaged-apps-developer-mode", false);
     onceThru = true;
   }
-
-  gPASLog = PR_NewLogModule("PackagedAppService");
 
   mListener = aListener;
   mState = STATE_UNKNOWN;
