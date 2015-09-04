@@ -1437,7 +1437,7 @@ pref("network.http.enforce-framing.soft", true);
 pref("network.http.enable-packaged-apps", false);
 
 // Enable this pref to skip verification process. The packaged app
-// will be considered signed no matter the package has a valid/invalid 
+// will be considered signed no matter the package has a valid/invalid
 // signature or no signature.
 pref("network.http.packaged-apps-developer-mode", false);
 
