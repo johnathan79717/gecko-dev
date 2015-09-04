@@ -118,7 +118,6 @@ PackagedAppVerifier::OnStopRequest(nsIRequest* aRequest,
                                     nsISupports* aContext,
                                     nsresult aStatusCode)
 {
-  MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
   NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
 
   nsresult rv = mHasher->Finish(true, mLastComputedResourceHash);
@@ -135,7 +134,7 @@ PackagedAppVerifier::OnStopRequest(nsIRequest* aRequest,
 void
 PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo* aInfo)
 {
-  MOZ_RELEASE_ASSERT(NS_IsMainThread(), "OnResourceCached must be on main thread");
+  MOZ_RELEASE_ASSERT(NS_IsMainThread(), "ProcessResourceCache must be on main thread");
 
   switch (mState) {
   case STATE_UNKNOWN:
