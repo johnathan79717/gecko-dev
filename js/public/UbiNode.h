@@ -97,7 +97,6 @@
 // represented by a "rope", a structure that points to the two original
 // strings.
 //
-//
 // We intend to use ubi::Node to write tools that report memory usage, so it's
 // important that ubi::Node accurately portray how much memory nodes consume.
 // Thus, for example, when data that apparently belongs to multiple nodes is
@@ -142,6 +141,25 @@
 // If this restriction prevents us from implementing interesting tools, we may
 // teach the GC how to root ubi::Nodes, fix up hash tables that use them as
 // keys, etc.
+//
+//
+// Hostile Graph Structure
+//
+// Analyses consuming ubi::Node graphs must be robust when presented with graphs
+// that are deliberately constructed to exploit their weaknesses. When operating
+// on live graphs, web content has control over the object graph, and less
+// direct control over shape and string structure, and analyses should be
+// prepared to handle extreme cases gracefully. For example, if an analysis were
+// to use the C++ stack in a depth-first traversal, carefully constructed
+// content could cause the analysis to overflow the stack.
+//
+// When ubi::Nodes refer to nodes deserialized from a heap snapshot, analyses
+// must be even more careful: since snapshots often come from potentially
+// compromised e10s content processes, even properties normally guaranteed by
+// the platform (the proper linking of DOM nodes, for example) might be
+// corrupted. While it is the deserializer's responsibility to check the basic
+// structure of the snapshot file, the analyses should be prepared for ubi::Node
+// graphs constructed from snapshots to be even more bizarre.
 
 class JSAtom;
 
@@ -437,6 +455,50 @@ bool ConstructSavedFrameStackSlow(JSContext* cx, JS::ubi::StackFrame& frame,
 
 /*** ubi::Node ************************************************************************************/
 
+// A concrete node specialization can claim its referent is a member of a
+// particular "coarse type" which is less specific than the actual
+// implementation type but generally more palatable for web developers. For
+// example, JitCode can be considered to have a coarse type of "Script". This is
+// used by some analyses for putting nodes into different buckets. The default,
+// if a concrete specialization does not provide its own mapping to a CoarseType
+// variant, is "Other".
+//
+// NB: the values associated with a particular enum variant must not change or
+// be reused for new variants. Doing so will cause inspecting ubi::Nodes backed
+// by an offline heap snapshot from an older SpiderMonkey/Firefox version to
+// break. Consider this enum append only.
+enum class CoarseType: uint32_t {
+    Other  = 0,
+    Object = 1,
+    Script = 2,
+    String = 3,
+
+    FIRST  = Other,
+    LAST   = String
+};
+
+inline uint32_t
+CoarseTypeToUint32(CoarseType type)
+{
+    return static_cast<uint32_t>(type);
+}
+
+inline bool
+Uint32IsValidCoarseType(uint32_t n)
+{
+    auto first = static_cast<uint32_t>(CoarseType::FIRST);
+    auto last = static_cast<uint32_t>(CoarseType::LAST);
+    MOZ_ASSERT(first < last);
+    return first <= n && n <= last;
+}
+
+inline CoarseType
+Uint32ToCoarseType(uint32_t n)
+{
+    MOZ_ASSERT(Uint32IsValidCoarseType(n));
+    return static_cast<CoarseType>(n);
+}
+
 // The base class implemented by each ubi::Node referent type. Subclasses must
 // not add data members to this class.
 class Base {
@@ -484,6 +546,9 @@ class Base {
     // opposed to something from a deserialized core dump. Returns false,
     // otherwise.
     virtual bool isLive() const { return true; };
+
+    // Return the coarse-grained type-of-thing that this node represents.
+    virtual CoarseType coarseType() const { return CoarseType::Other; }
 
     // Return a human-readable name for the referent's type. The result should
     // be statically allocated. (You can use MOZ_UTF16("strings") for this.)
@@ -652,10 +717,6 @@ class Node {
     template<typename T>
     static const char16_t* canonicalTypeName() { return Concrete<T>::concreteTypeName; }
 
-    // Get the canonical type name for the supplied string, if one
-    // exists. Otherwise nullptr is returned.
-    static const char16_t* getCanonicalTypeName(const char16_t* dupe, size_t length);
-
     template<typename T>
     bool is() const {
         return base()->typeName() == canonicalTypeName<T>();
@@ -680,6 +741,7 @@ class Node {
     // not all!) JSObjects can be exposed.
     JS::Value exposeToJS() const;
 
+    CoarseType coarseType()         const { return base()->coarseType(); }
     const char16_t* typeName()      const { return base()->typeName(); }
     JS::Zone* zone()                const { return base()->zone(); }
     JSCompartment* compartment()    const { return base()->compartment(); }
@@ -963,7 +1025,16 @@ class TracerConcreteWithCompartment : public TracerConcrete<Referent> {
 // Define specializations for some commonly-used public JSAPI types.
 // These can use the generic templates above.
 template<> struct Concrete<JS::Symbol> : TracerConcrete<JS::Symbol> { };
-template<> struct Concrete<JSScript> : TracerConcreteWithCompartment<JSScript> { };
+
+template<> struct Concrete<JSScript> : TracerConcreteWithCompartment<JSScript> {
+    CoarseType coarseType() const final { return CoarseType::Script; }
+
+  protected:
+    explicit Concrete(JSScript *ptr) : TracerConcreteWithCompartment<JSScript>(ptr) { }
+
+  public:
+    static void construct(void *storage, JSScript *ptr) { new (storage) Concrete(ptr); }
+};
 
 // The JSObject specialization.
 template<>
@@ -975,6 +1046,8 @@ class Concrete<JSObject> : public TracerConcreteWithCompartment<JSObject> {
 
     bool hasAllocationStack() const override;
     StackFrame allocationStack() const override;
+
+    CoarseType coarseType() const final { return CoarseType::Object; }
 
   protected:
     explicit Concrete(JSObject* ptr) : TracerConcreteWithCompartment(ptr) { }
@@ -988,6 +1061,8 @@ class Concrete<JSObject> : public TracerConcreteWithCompartment<JSObject> {
 // For JSString, we extend the generic template with a 'size' implementation.
 template<> struct Concrete<JSString> : TracerConcrete<JSString> {
     Size size(mozilla::MallocSizeOf mallocSizeOf) const override;
+
+    CoarseType coarseType() const final { return CoarseType::String; }
 
   protected:
     explicit Concrete(JSString *ptr) : TracerConcrete<JSString>(ptr) { }
@@ -1004,6 +1079,7 @@ class Concrete<void> : public Base {
     UniquePtr<EdgeRange> edges(JSContext* cx, bool wantNames) const override;
     JS::Zone* zone() const override;
     JSCompartment* compartment() const override;
+    CoarseType coarseType() const final;
 
     explicit Concrete(void* ptr) : Base(ptr) { }
 

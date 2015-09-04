@@ -1831,7 +1831,8 @@ function gotoHistoryIndex(aEvent) {
   }
   // Modified click. Go there in a new tab/window.
 
-  duplicateTabIn(gBrowser.selectedTab, where, index - gBrowser.sessionHistory.index);
+  let historyindex = aEvent.target.getAttribute("historyindex");
+  duplicateTabIn(gBrowser.selectedTab, where, Number(historyindex));
   return true;
 }
 
@@ -3753,66 +3754,108 @@ function FillHistoryMenu(aParent) {
   }
 
   // Remove old entries if any
-  var children = aParent.childNodes;
+  let children = aParent.childNodes;
   for (var i = children.length - 1; i >= 0; --i) {
     if (children[i].hasAttribute("index"))
       aParent.removeChild(children[i]);
   }
 
-  var webNav = gBrowser.webNavigation;
-  var sessionHistory = webNav.sessionHistory;
+  const MAX_HISTORY_MENU_ITEMS = 15;
 
-  var count = sessionHistory.count;
-  if (count <= 1) // don't display the popup for a single item
+  const tooltipBack = gNavigatorBundle.getString("tabHistory.goBack");
+  const tooltipCurrent = gNavigatorBundle.getString("tabHistory.current");
+  const tooltipForward = gNavigatorBundle.getString("tabHistory.goForward");
+
+  function updateSessionHistory(sessionHistory, initial)
+  {
+    let count = sessionHistory.entries.length;
+
+    if (!initial) {
+      if (count <= 1) {
+        // if there is only one entry now, close the popup.
+        aParent.hidePopup();
+        return;
+      } else if (!aParent.parentNode.open) {
+        // if the popup wasn't open before, but now needs to be, reopen the menu.
+        // It should trigger FillHistoryMenu again.
+        aParent.parentNode.open = true;
+        return;
+      }
+    }
+
+    let index = sessionHistory.index;
+    let half_length = Math.floor(MAX_HISTORY_MENU_ITEMS / 2);
+    let start = Math.max(index - half_length, 0);
+    let end = Math.min(start == 0 ? MAX_HISTORY_MENU_ITEMS : index + half_length + 1, count);
+    if (end == count) {
+      start = Math.max(count - MAX_HISTORY_MENU_ITEMS, 0);
+    }
+
+    let existingIndex = 0;
+
+    for (let j = end - 1; j >= start; j--) {
+      let entry = sessionHistory.entries[j];
+      let uri = entry.url;
+
+      let item = existingIndex < children.length ?
+                   children[existingIndex] : document.createElement("menuitem");
+
+      let entryURI = BrowserUtils.makeURI(entry.url, entry.charset, null);
+      item.setAttribute("uri", uri);
+      item.setAttribute("label", entry.title || uri);
+      item.setAttribute("index", j);
+
+      // Cache this so that gotoHistoryIndex doesn't need the original index
+      item.setAttribute("historyindex", j - index);
+
+      if (j != index) {
+        PlacesUtils.favicons.getFaviconURLForPage(entryURI, function (aURI) {
+          if (aURI) {
+            let iconURL = PlacesUtils.favicons.getFaviconLinkForIcon(aURI).spec;
+            iconURL = PlacesUtils.getImageURLForResolution(window, iconURL);
+            item.style.listStyleImage = "url(" + iconURL + ")";
+          }
+        });
+      }
+
+      if (j < index) {
+        item.className = "unified-nav-back menuitem-iconic menuitem-with-favicon";
+        item.setAttribute("tooltiptext", tooltipBack);
+      } else if (j == index) {
+        item.setAttribute("type", "radio");
+        item.setAttribute("checked", "true");
+        item.className = "unified-nav-current";
+        item.setAttribute("tooltiptext", tooltipCurrent);
+      } else {
+        item.className = "unified-nav-forward menuitem-iconic menuitem-with-favicon";
+        item.setAttribute("tooltiptext", tooltipForward);
+      }
+
+      if (!item.parentNode) {
+        aParent.appendChild(item);
+      }
+
+      existingIndex++;
+    }
+
+    if (!initial) {
+      let existingLength = children.length;
+      while (existingIndex < existingLength) {
+        aParent.removeChild(aParent.lastChild);
+        existingIndex++;
+      }
+    }
+  }
+
+  let sessionHistory = SessionStore.getSessionHistory(gBrowser.selectedTab, updateSessionHistory);
+  if (!sessionHistory)
     return false;
 
-  const MAX_HISTORY_MENU_ITEMS = 15;
-  var index = sessionHistory.index;
-  var half_length = Math.floor(MAX_HISTORY_MENU_ITEMS / 2);
-  var start = Math.max(index - half_length, 0);
-  var end = Math.min(start == 0 ? MAX_HISTORY_MENU_ITEMS : index + half_length + 1, count);
-  if (end == count)
-    start = Math.max(count - MAX_HISTORY_MENU_ITEMS, 0);
+  // don't display the popup for a single item
+  if (sessionHistory.entries.length <= 1)
+    return false;
 
-  var tooltipBack = gNavigatorBundle.getString("tabHistory.goBack");
-  var tooltipCurrent = gNavigatorBundle.getString("tabHistory.current");
-  var tooltipForward = gNavigatorBundle.getString("tabHistory.goForward");
-
-  for (var j = end - 1; j >= start; j--) {
-    let item = document.createElement("menuitem");
-    let entry = sessionHistory.getEntryAtIndex(j, false);
-    let uri = entry.URI.spec;
-    let entryURI = BrowserUtils.makeURIFromCPOW(entry.URI);
-
-    item.setAttribute("uri", uri);
-    item.setAttribute("label", entry.title || uri);
-    item.setAttribute("index", j);
-
-    if (j != index) {
-      PlacesUtils.favicons.getFaviconURLForPage(entryURI, function (aURI) {
-        if (aURI) {
-          let iconURL = PlacesUtils.favicons.getFaviconLinkForIcon(aURI).spec;
-          iconURL = PlacesUtils.getImageURLForResolution(window, iconURL);
-          item.style.listStyleImage = "url(" + iconURL + ")";
-        }
-      });
-    }
-
-    if (j < index) {
-      item.className = "unified-nav-back menuitem-iconic menuitem-with-favicon";
-      item.setAttribute("tooltiptext", tooltipBack);
-    } else if (j == index) {
-      item.setAttribute("type", "radio");
-      item.setAttribute("checked", "true");
-      item.className = "unified-nav-current";
-      item.setAttribute("tooltiptext", tooltipCurrent);
-    } else {
-      item.className = "unified-nav-forward menuitem-iconic menuitem-with-favicon";
-      item.setAttribute("tooltiptext", tooltipForward);
-    }
-
-    aParent.appendChild(item);
-  }
+  updateSessionHistory(sessionHistory, true);
   return true;
 }
 
@@ -4838,7 +4881,9 @@ nsBrowserAccess.prototype = {
     if (aOpener && aOpener.document) {
       referrerPolicy = aOpener.document.referrerPolicy;
     }
-    let isPrivate = PrivateBrowsingUtils.isWindowPrivate(aOpener || window);
+    let isPrivate = aOpener
+                  ? PrivateBrowsingUtils.isContentWindowPrivate(aOpener)
+                  : PrivateBrowsingUtils.isWindowPrivate(window);
 
     switch (aWhere) {
       case Ci.nsIBrowserDOMWindow.OPEN_NEWWINDOW :
@@ -6750,6 +6795,10 @@ var gIdentityHandler = {
     delete this._permissionList;
     return this._permissionList = document.getElementById("identity-popup-permission-list");
   },
+  get _permissionSubviewList () {
+    delete this._permissionSubviewList;
+    return this._permissionSubviewList = document.getElementById("identity-popup-permission-subview-list");
+  },
 
   /**
    * Rebuild cache of the elements that may or may not exist depending
@@ -6770,6 +6819,7 @@ var gIdentityHandler = {
     this._identityIcon = document.getElementById("page-proxy-favicon");
     this._permissionsContainer = document.getElementById("identity-popup-permissions");
     this._permissionList = document.getElementById("identity-popup-permission-list");
+    this._permissionSubviewList = document.getElementById("identity-popup-permission-subview-list");
   },
 
   /**
@@ -7243,16 +7293,23 @@ var gIdentityHandler = {
     while (this._permissionList.hasChildNodes())
       this._permissionList.removeChild(this._permissionList.lastChild);
 
+    while (this._permissionSubviewList.hasChildNodes())
+      this._permissionSubviewList.removeChild(this._permissionSubviewList.lastChild);
+
     let uri = gBrowser.currentURI;
 
     for (let permission of SitePermissions.listPermissions()) {
       let state = SitePermissions.get(uri, permission);
-
-      if (state == SitePermissions.UNKNOWN)
-        continue;
-
       let item = this._createPermissionItem(permission, state);
-      this._permissionList.appendChild(item);
+
+      // Add to the main view only if there is a known / non-default
+      // value for the permission for this site.
+      if (state != SitePermissions.UNKNOWN) {
+        this._permissionList.appendChild(item.cloneNode(true));
+      }
+
+      // Add all permissions to the subview.
+      this._permissionSubviewList.appendChild(item);
     }
 
     this._permissionsContainer.hidden = !this._permissionList.hasChildNodes();
@@ -7271,20 +7328,30 @@ var gIdentityHandler = {
     for (let state of SitePermissions.getAvailableStates(aPermission)) {
       let menuitem = document.createElement("menuitem");
       menuitem.setAttribute("value", state);
-      menuitem.setAttribute("label", SitePermissions.getStateLabel(aPermission, state));
+      let label = SitePermissions.getStateLabel(aPermission, state);
+      menuitem.setAttribute("label", label);
+      menuitem.setAttribute("tooltiptext", label);
       menupopup.appendChild(menuitem);
     }
     menulist.appendChild(menupopup);
-    menulist.setAttribute("value", aState);
+    let value = aState;
+    if (aState == SitePermissions.UNKNOWN) {
+      value = SitePermissions.getDefault(aPermission);
+    }
+    menulist.setAttribute("value", value);
     menulist.setAttribute("oncommand", "gIdentityHandler.setPermission('" +
                                        aPermission + "', this.value)");
     menulist.setAttribute("id", "identity-popup-permission:" + aPermission);
+    menulist.setAttribute("class", "identity-popup-permission");
 
     let label = document.createElement("label");
+    let labelText = SitePermissions.getPermissionLabel(aPermission);
     label.setAttribute("flex", "1");
     label.setAttribute("class", "identity-popup-permission-label");
     label.setAttribute("control", menulist.getAttribute("id"));
-    label.setAttribute("value", SitePermissions.getPermissionLabel(aPermission));
+    label.setAttribute("crop", "end");
+    label.setAttribute("value", labelText);
+    label.setAttribute("tooltiptext", labelText);
 
     let container = document.createElement("hbox");
     container.setAttribute("align", "center");
@@ -7532,6 +7599,17 @@ function restoreLastSession() {
 
 var TabContextMenu = {
   contextTab: null,
+  _updateToggleMuteMenuItem(aTab, aConditionFn) {
+    ["muted", "soundplaying"].forEach(attr => {
+      if (!aConditionFn || aConditionFn(attr)) {
+        if (aTab.hasAttribute(attr)) {
+          aTab.toggleMuteMenuItem.setAttribute(attr, "true");
+        } else {
+          aTab.toggleMuteMenuItem.removeAttribute(attr);
+        }
+      }
+    });
+  },
   updateContextMenu: function updateContextMenu(aPopupMenu) {
     this.contextTab = aPopupMenu.triggerNode.localName == "tab" ?
                       aPopupMenu.triggerNode : gBrowser.selectedTab;
@@ -7591,6 +7669,25 @@ var TabContextMenu = {
     } else {
       toggleMute.label = gNavigatorBundle.getString("muteTab.label");
       toggleMute.accessKey = gNavigatorBundle.getString("muteTab.accesskey");
+    }
+
+    this.contextTab.toggleMuteMenuItem = toggleMute;
+    this._updateToggleMuteMenuItem(this.contextTab);
+
+    this.contextTab.addEventListener("TabAttrModified", this, false);
+    aPopupMenu.addEventListener("popuphiding", this, false);
+  },
+  handleEvent(aEvent) {
+    switch (aEvent.type) {
+      case "popuphiding":
+        gBrowser.removeEventListener("TabAttrModified", this);
+        aEvent.target.removeEventListener("popuphiding", this);
+        break;
+      case "TabAttrModified":
+        let tab = aEvent.target;
+        this._updateToggleMuteMenuItem(tab,
+          attr => aEvent.detail.changed.indexOf(attr) >= 0);
+        break;
     }
   }
 };

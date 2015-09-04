@@ -319,7 +319,7 @@ AsmJSModule::finish(ExclusiveContext* cx, TokenStream& tokenStream, MacroAssembl
     MOZ_ASSERT(masm.jumpRelocationTableBytes() == 0);
     MOZ_ASSERT(masm.dataRelocationTableBytes() == 0);
     MOZ_ASSERT(masm.preBarrierTableBytes() == 0);
-    MOZ_ASSERT(!masm.hasEnteredExitFrame());
+    MOZ_ASSERT(!masm.hasSelfReference());
 
     // Copy over metadata, making sure to update all offsets on ARM.
 
@@ -1025,7 +1025,7 @@ AsmJSModuleObject_trace(JSTracer* trc, JSObject* obj)
 
 const Class AsmJSModuleObject::class_ = {
     "AsmJSModuleObject",
-    JSCLASS_IS_ANONYMOUS | JSCLASS_IMPLEMENTS_BARRIERS | JSCLASS_DELAY_METADATA_CALLBACK |
+    JSCLASS_IS_ANONYMOUS | JSCLASS_DELAY_METADATA_CALLBACK |
     JSCLASS_HAS_RESERVED_SLOTS(AsmJSModuleObject::RESERVED_SLOTS),
     nullptr, /* addProperty */
     nullptr, /* delProperty */

@@ -415,6 +415,7 @@ pref("font.size.inflation.minTwips", 0);
 pref("browser.ui.zoom.force-user-scalable", false);
 
 pref("ui.zoomedview.enabled", true);
+pref("ui.zoomedview.keepLimitSize", 16); // value in layer pixels, used to not keep the large elements in the cluster list (Bug 1191041)
 pref("ui.zoomedview.limitReadableSize", 8); // value in layer pixels
 pref("ui.zoomedview.defaultZoomFactor", 2);
 pref("ui.zoomedview.simplified", true); // Do not display all the zoomed view controls
@@ -930,5 +931,4 @@ pref("consoleservice.logcat", true);
 // Enable Cardboard VR on mobile, assuming VR at all is enabled
 pref("dom.vr.cardboard.enabled", true);
 
-// TODO: Disabled until bug 1190301 is fixed.
-pref("browser.tabs.showAudioPlayingIcon", false);
+pref("browser.tabs.showAudioPlayingIcon", true);

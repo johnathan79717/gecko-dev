@@ -654,6 +654,11 @@ class GCRuntime
 
     size_t maxMallocBytesAllocated() { return maxMallocBytes; }
 
+    uint64_t nextCellUniqueId() {
+        MOZ_ASSERT(nextCellUniqueId_ > 0);
+        return nextCellUniqueId_++;
+    }
+
   public:
     // Internal public interface
     js::gc::State state() const { return incrementalState; }
@@ -767,13 +772,12 @@ class GCRuntime
     void setFoundBlackGrayEdges() { foundBlackGrayEdges = true; }
 
     uint64_t gcNumber() const { return number; }
-    void incGcNumber() { ++number; }
 
     uint64_t minorGCCount() const { return minorGCNumber; }
-    void incMinorGcNumber() { ++minorGCNumber; }
+    void incMinorGcNumber() { ++minorGCNumber; ++number; }
 
     uint64_t majorGCCount() const { return majorGCNumber; }
-    void incMajorGcNumber() { ++majorGCNumber; }
+    void incMajorGcNumber() { ++majorGCNumber; ++number; }
 
     int64_t defaultSliceBudget() const { return defaultTimeBudget_; }
 
@@ -1008,6 +1012,9 @@ class GCRuntime
     RootedValueMap rootsHash;
 
     size_t maxMallocBytes;
+
+    // An incrementing id used to assign unique ids to cells that require one.
+    uint64_t nextCellUniqueId_;
 
     /*
      * Number of the committed arenas in all GC chunks including empty chunks.

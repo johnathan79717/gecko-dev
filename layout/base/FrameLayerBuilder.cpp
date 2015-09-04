@@ -30,6 +30,7 @@
 #include "nsPrintfCString.h"
 #include "nsRenderingContext.h"
 #include "nsSVGIntegrationUtils.h"
+#include "mozilla/LayerTimelineMarker.h"
 
 #include "mozilla/Move.h"
 #include "mozilla/ReverseIterator.h"
@@ -421,17 +422,7 @@ public:
    * Add the given hit regions to the hit regions to the hit retions for this
    * PaintedLayer.
    */
-  void AccumulateEventRegions(nsDisplayLayerEventRegions* aEventRegions)
-  {
-    FLB_LOG_PAINTED_LAYER_DECISION(this, "Accumulating event regions %p against pld=%p\n", aEventRegions, this);
-
-    mHitRegion.Or(mHitRegion, aEventRegions->HitRegion());
-    mMaybeHitRegion.Or(mMaybeHitRegion, aEventRegions->MaybeHitRegion());
-    mDispatchToContentHitRegion.Or(mDispatchToContentHitRegion, aEventRegions->DispatchToContentHitRegion());
-    mNoActionRegion.Or(mNoActionRegion, aEventRegions->NoActionRegion());
-    mHorizontalPanRegion.Or(mHorizontalPanRegion, aEventRegions->HorizontalPanRegion());
-    mVerticalPanRegion.Or(mVerticalPanRegion, aEventRegions->VerticalPanRegion());
-  }
+  void AccumulateEventRegions(ContainerState* aState, nsDisplayLayerEventRegions* aEventRegions);
 
   /**
    * If this represents only a nsDisplayImage, and the image type supports being
@@ -446,13 +437,8 @@ public:
    */
   already_AddRefed<ImageContainer> GetContainerForImageLayer(nsDisplayListBuilder* aBuilder);
 
-  bool VisibleAboveRegionIntersects(const nsIntRect& aRect) const
-  { return mVisibleAboveRegion.Intersects(aRect); }
   bool VisibleAboveRegionIntersects(const nsIntRegion& aRegion) const
   { return !mVisibleAboveRegion.Intersect(aRegion).IsEmpty(); }
-
-  bool VisibleRegionIntersects(const nsIntRect& aRect) const
-  { return mVisibleRegion.Intersects(aRect); }
   bool VisibleRegionIntersects(const nsIntRegion& aRegion) const
   { return !mVisibleRegion.Intersect(aRegion).IsEmpty(); }
 
@@ -500,6 +486,14 @@ public:
    * mDispatchToContentHitRegion.
    */
   nsRegion mVerticalPanRegion;
+  /**
+   * Scaled versions of mHitRegion and mMaybeHitRegion.
+   * We store these because FindPaintedLayerFor() needs to consume them
+   * in this form, and it's a hot code path so we don't wnat to scale
+   * them inside that function.
+   */
+  nsIntRegion mScaledHitRegion;
+  nsIntRegion mScaledMaybeHitRegion;
   /**
    * The "active scrolled root" for all content in the layer. Must
    * be non-null; all content in a PaintedLayer must have the same
@@ -1087,6 +1081,13 @@ public:
 
   nsIFrame* GetContainerFrame() const { return mContainerFrame; }
   nsDisplayListBuilder* Builder() const { return mBuilder; }
+
+  /**
+   * Check if we are currently inside an inactive layer.
+   */
+  bool IsInInactiveLayer() const {
+    return mLayerBuilder->GetContainingPaintedLayerData();
+  }
 
   /**
    * Sets aOuterVisibleRegion as aLayer's visible region. aOuterVisibleRegion
@@ -2584,12 +2585,22 @@ PaintedLayerDataNode::FindPaintedLayerFor(const nsIntRect& aVisibleRect,
     } else {
       PaintedLayerData* lowestUsableLayer = nullptr;
       for (auto& data : Reversed(mPaintedLayerDataStack)) {
-        if (data.VisibleAboveRegionIntersects(aVisibleRect)) {
+        if (data.mVisibleAboveRegion.Intersects(aVisibleRect)) {
           break;
         }
         MOZ_ASSERT(!data.mExclusiveToOneItem);
         lowestUsableLayer = &data;
-        if (data.VisibleRegionIntersects(aVisibleRect)) {
+        nsIntRegion visibleRegion = data.mVisibleRegion;
+        // When checking whether the visible region intersects the given
+        // visible rect, also include the event-regions in the visible region,
+        // unless we're in an inactive layer, in which case the event-regions
+        // will be hoisted out into their own layer.
+        ContainerState& contState = mTree.ContState();
+        if (!contState.IsInInactiveLayer()) {
+          visibleRegion.OrWith(data.mScaledHitRegion);
+          visibleRegion.OrWith(data.mScaledMaybeHitRegion);
+        }
+        if (visibleRegion.Intersects(aVisibleRect)) {
           break;
         }
       }
@@ -3426,6 +3437,29 @@ PaintedLayerData::Accumulate(ContainerState* aState,
   }
 }
 
+void
+PaintedLayerData::AccumulateEventRegions(ContainerState* aState, nsDisplayLayerEventRegions* aEventRegions)
+{
+  FLB_LOG_PAINTED_LAYER_DECISION(this, "Accumulating event regions %p against pld=%p\n", aEventRegions, this);
+
+  mHitRegion.Or(mHitRegion, aEventRegions->HitRegion());
+  mMaybeHitRegion.Or(mMaybeHitRegion, aEventRegions->MaybeHitRegion());
+  mDispatchToContentHitRegion.Or(mDispatchToContentHitRegion, aEventRegions->DispatchToContentHitRegion());
+  mNoActionRegion.Or(mNoActionRegion, aEventRegions->NoActionRegion());
+  mHorizontalPanRegion.Or(mHorizontalPanRegion, aEventRegions->HorizontalPanRegion());
+  mVerticalPanRegion.Or(mVerticalPanRegion, aEventRegions->VerticalPanRegion());
+
+  // Simplify the maybe-hit region because it can be a complex region
+  // and operations on it, such as the scaling below and the use of the
+  // result in hot code paths like FindPaintedLayerFor(), can be very expensive.
+  mMaybeHitRegion.SimplifyOutward(8);
+
+  // Calculate scaled versions of mHitRegion and mMaybeHitRegion for quick
+  // access in FindPaintedLayerFor().
+  mScaledHitRegion = aState->ScaleRegionToOutsidePixels(mHitRegion);
+  mScaledMaybeHitRegion = aState->ScaleRegionToOutsidePixels(mMaybeHitRegion);
+}
+
 PaintedLayerData
 ContainerState::NewPaintedLayerData(nsDisplayItem* aItem,
                                     const nsIntRect& aVisibleRect,
@@ -4000,7 +4034,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       if (itemType == nsDisplayItem::TYPE_LAYER_EVENT_REGIONS) {
         nsDisplayLayerEventRegions* eventRegions =
             static_cast<nsDisplayLayerEventRegions*>(item);
-        paintedLayerData->AccumulateEventRegions(eventRegions);
+        paintedLayerData->AccumulateEventRegions(this, eventRegions);
       } else {
         // check to see if the new item has rounded rect clips in common with
         // other items in the layer
@@ -5485,36 +5519,6 @@ static void DrawForcedBackgroundColor(DrawTarget& aDrawTarget,
   }
 }
 
-class LayerTimelineMarker : public TimelineMarker
-{
-public:
-  LayerTimelineMarker(nsDocShell* aDocShell, const nsIntRegion& aRegion)
-    : TimelineMarker(aDocShell, "Layer", TRACING_EVENT)
-    , mRegion(aRegion)
-  {
-  }
-
-  ~LayerTimelineMarker()
-  {
-  }
-
-  virtual void AddLayerRectangles(mozilla::dom::Sequence<mozilla::dom::ProfileTimelineLayerRect>& aRectangles) override
-  {
-    nsIntRegionRectIterator it(mRegion);
-    while (const nsIntRect* iterRect = it.Next()) {
-      mozilla::dom::ProfileTimelineLayerRect rect;
-      rect.mX = iterRect->X();
-      rect.mY = iterRect->Y();
-      rect.mWidth = iterRect->Width();
-      rect.mHeight = iterRect->Height();
-      aRectangles.AppendElement(rect, fallible);
-    }
-  }
-
-private:
-  nsIntRegion mRegion;
-};
-
 /*
  * A note on residual transforms:
  *
@@ -5675,8 +5679,7 @@ FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
     bool isRecording;
     docShell->GetRecordProfileTimelineMarkers(&isRecording);
     if (isRecording) {
-      mozilla::UniquePtr<TimelineMarker> marker =
-        MakeUnique<LayerTimelineMarker>(docShell, aRegionToDraw);
+      UniquePtr<TimelineMarker> marker = MakeUnique<LayerTimelineMarker>(aRegionToDraw);
       TimelineConsumers::AddMarkerForDocShell(docShell, Move(marker));
     }
   }

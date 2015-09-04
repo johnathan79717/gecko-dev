@@ -302,6 +302,17 @@ struct MOZ_STACK_CLASS ParseContext : public GenericParseContext
     //   if (cond) { function f3() { if (cond) { function f4() { } } } }
     //
     bool atBodyLevel() {
+        // 'eval' scripts are always under an invisible lexical scope, but
+        // since it is not syntactic, it should still be considered at body
+        // level.
+        if (sc->staticScope() && sc->staticScope()->is<StaticEvalObject>()) {
+            bool bl = !innermostStmt()->enclosing;
+            MOZ_ASSERT_IF(bl, innermostStmt()->type == StmtType::BLOCK);
+            MOZ_ASSERT_IF(bl, innermostStmt()->staticScope
+                                             ->template as<StaticBlockObject>()
+                                             .maybeEnclosingEval() == sc->staticScope());
+            return bl;
+        }
         return !innermostStmt();
     }
 
@@ -344,12 +355,16 @@ class CompExprTransplanter;
 
 enum VarContext { HoistVars, DontHoistVars };
 enum PropListType { ObjectLiteral, ClassBody, DerivedClassBody };
-
-inline bool
-IsClassBody(PropListType type)
-{
-    return type == ClassBody || type == DerivedClassBody;
-}
+enum class PropertyType {
+    Normal,
+    Shorthand,
+    Getter,
+    Setter,
+    Method,
+    GeneratorMethod,
+    Constructor,
+    DerivedConstructor
+};
 
 // Specify a value for an ES6 grammar parametrization.  We have no enum for
 // [Return] because its behavior is exactly equivalent to checking whether
@@ -560,6 +575,12 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
 
     bool maybeParseDirective(Node list, Node pn, bool* cont);
 
+    // Parse the body of an eval. It is distinguished from global scripts in
+    // that in ES6, per 18.2.1.1 steps 9 and 10, all eval scripts are executed
+    // under a fresh lexical scope.
+    Node evalBody();
+
+    // Parse a module.
     Node standaloneModule(Handle<ModuleObject*> module);
 
     // Parse a function, given only its body. Used for the Function and
@@ -674,9 +695,8 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     bool tryNewTarget(Node& newTarget);
     bool checkAndMarkSuperScope();
 
-    bool methodDefinition(YieldHandling yieldHandling, PropListType listType, Node propList,
-                          Node propname, FunctionSyntaxKind kind, GeneratorKind generatorKind,
-                          bool isStatic, JSOp Op);
+    Node methodDefinition(YieldHandling yieldHandling, PropertyType propType,
+                          HandlePropertyName funName);
 
     /*
      * Additional JS parsers.
@@ -781,12 +801,13 @@ class Parser : private JS::AutoGCRooter, public StrictModeGetter
     Node pushLexicalScope(Handle<StaticBlockObject*> blockObj, AutoPushStmtInfoPC& stmt);
     Node pushLetScope(Handle<StaticBlockObject*> blockObj, AutoPushStmtInfoPC& stmt);
     bool noteNameUse(HandlePropertyName name, Node pn);
+    Node propertyName(YieldHandling yieldHandling, Node propList,
+                      PropertyType* propType, MutableHandleAtom propAtom);
     Node computedPropertyName(YieldHandling yieldHandling, Node literal);
     Node arrayInitializer(YieldHandling yieldHandling);
     Node newRegExp();
 
-    Node propertyList(YieldHandling yieldHandling, PropListType type);
-    Node newPropertyListNode(PropListType type);
+    Node objectLiteral(YieldHandling yieldHandling);
 
     bool checkAndPrepareLexical(bool isConst, const TokenPos& errorPos);
     Node makeInitializedLexicalBinding(HandlePropertyName name, bool isConst, const TokenPos& pos);

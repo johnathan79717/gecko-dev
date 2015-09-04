@@ -283,8 +283,7 @@ enum ExecuteType {
     EXECUTE_MODULE         =        0x4, /* == InterpreterFrame::GLOBAL */
     EXECUTE_DIRECT_EVAL    =        0x8, /* == InterpreterFrame::EVAL */
     EXECUTE_INDIRECT_EVAL  =        0x9, /* == InterpreterFrame::GLOBAL | EVAL */
-    EXECUTE_DEBUG          =       0x18, /* == InterpreterFrame::EVAL | DEBUGGER */
-    EXECUTE_DEBUG_GLOBAL   =       0x19  /* == InterpreterFrame::EVAL | DEBUGGER | GLOBAL */
+    EXECUTE_DEBUG          =       0x18, /* == InterpreterFrame::EVAL | DEBUGGER_EVAL */
 };
 
 /*****************************************************************************/
@@ -323,7 +322,7 @@ class InterpreterFrame
         /* (0x80 is unused) */
 
         /* Function prologue state */
-        HAS_CALL_OBJ           =      0x100,  /* CallObject created for heavyweight fun */
+        HAS_CALL_OBJ           =      0x100,  /* CallObject created for needsCallObject function */
         HAS_ARGS_OBJ           =      0x200,  /* ArgumentsObject created for needsArgsObj script */
 
         /* Lazy frame initialization */
