@@ -2,13 +2,29 @@ const header_missing_signature = "header1: content1";
 const header_invalid_signature = `header1: content1
 manifest-signature: invalid-signature`;
 const header = `header1: content1
-manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDgyNDA5MTEzOFoXDTM1MDgyNDA5MTEzOFowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA2qMp97njHVXbnafne6qIx5D+j2AUC6j2159DK6PnL78L5UxD2KgjQZvkOaIZJe11KPYTf7upftat4Shs1c0SsMbHzDY7K0E/lSslD4zmb4TckOGPZzxtEIl7v3+yCjKqMRRMcBnaB20LrxTPQ3PS9iBCzTVbWlosbqmK/+1Pkv4Cmp3sXWJm9QA1QAgJu0dm8sTCyW0F8M3t9zIRNkZoQCERiLYQ/zIDC62B1iS6pOswz2MX3lh05O1FYKJ/y+lM+U7Wv/Ml87cpDNztmNbS1LET1wFjxiXNrc9kuqveT1Ccb4XG3x7KykXTfAnGGJb1mTM1YK84drfVmbgbNixgvwIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBAGEqlAKtBMFSalloBdQBR0KODIhzAJfkzp0FIokZwF4YsXsAZdPpdZ4rwLTfdI1IhF2vLkW3KAuV0fEtShuqTIZVFqszEy/N2mLIZ5bjqJzqDT3/az4/vn/UBBgEiVvkSYYn0WlypRsGtpax9XSZvmXJ7PW9VKokJ5xIuFT87oyhdz3e5NgymmK2KGuBLUWKNNxap9GU2CEHVvsETcjqeELhH2LXd7H4xWVBu54tmuAIGa9Q16OenhMejEkAdbHzth0X/M/KNIEoucXRLtK8xVxdN4wcYZCXwQR1dgej7G4ZzcKtzJqN12msyKaeaJnhHBWYCCRaziH8q4Cswyp3BHwxggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA4MjQwOTExMzhaMCMGCSqGSIb3DQEJBDEWBBTtO4QkpGTDLlHwE3ltN+RQpJn30DANBgkqhkiG9w0BAQEFAASCAQAKh/cWKYNqR6gBxY2HM7k5fZTePu4Lo73A0yjEDalKmywrWQ9x88d+dIZNlxfeQ1Uk+RNNVkNNjKkFBLHEP6HHAVYaevRFAqBG4Z2n+jY9Pjko7vqcF3cseg5p4vx7Emb7GMU0V/9Mfvfpw1tST/rn9iUnruIQGkFEnG7VkSBrOJHuQYwXuzd2LHEoj9OhrsNRKccjy9vzX0+1zKBVqRJ4x+TQU19/KED5LW59btStEJhGdmcPgs2QC4rwymvTZiOyd5L2vWtZm2FdAUGpINSnptIA+3m23RtNkeWUoE2H45EWPgCWwQeYSZibxw3Zn1tG9FznTtSCWrsgXXWNBomc
+manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDkwNzA5MzU0OVoXDTM1MDkwNzA5MzU0OVowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA3UfgRY0p4F0shg3ArwvKjTUVnHTlD6ipUeJa3KLXejmp7pi37AlsYNba1lbcynoIYzK/jg+8PsTcFJHiVSrSV9ihNGPC40bKM9x5kEwYOHkBSnszMatYAa7bTwcHe90aiUolSvhmO37Tj1c3g1cKAYNEY6cYk0u3n6iN8EnqhETzfBlpLVVaQcEwspcSFNvkm8r0GU0vldVz6Xfsnw5zfq1nkQ1Pri1Y4SV5S3sPNuWQa/7wQmmGmBnckQhtk9Jga8ymOqINaf0GBrSk++YQf5CTuMjrmjnH0813YuC/QHP2pKVrxSl9vVJyt0226jCe+7ZEm8C3XPpU2mRmMMyaYQIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBACP9RcwB8xbI/4JUvPO2i5UXkYTek+uczG6URqoSuug9PhuIdHcBeUQG3BAmpj2hF8LxzEAlChesKGPKhCXKYDzy+8T1MkYQzruAx7w0xVJ4NE+4L1PJKT5zfO7NBcGTaYmVwT79arAAha1p+gH8w5JgEK5CueBzospNaRek+JW9FmtGrn+WjtMwlYbEx/w9IYByQsCqGqKaqrIFromr6S++h8BSagyqo6xc5YMp43KVzAm/vio9lCKcpUGxm6+3sosbOd32jX7zg9+Cq1MR6PmUkOWv+KPTL+/5CfNNQ4OGMbM3bmOvpZjPoDAMi9IRKl4Bvic4XBBoQi+58RkDdHExggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA5MDcwOTM2NTlaMCMGCSqGSIb3DQEJBDEWBBSaNkK4BAXiE028nDHLnPO4y5V6SDANBgkqhkiG9w0BAQEFAASCAQA/nq+X1eJAUhMdiBu1UnQPF7xvze3I/Dro7I1Cvfy2pgj9CDpfgqV0Q0jbxxv76IHtcC4RJCKl+jbOZSpOW95rWqtlXjSfwmrAXB8n5E40fHMc67tclj1MEHEvRT0Fsitiksl79/f460XVdtDdG82SKpgXHGGxVX/PcsfOuPc4RrT7DU8Fmb1XTcbbtyRVSqRUNznz8xJpIUGP3DqvA/7XkquqGye650nIT5P9LLMpXl/4IiDYQzp7bLY8G+B7FM8LFk8EAajwHfDw3CX56HT3p+AT7Ho/GQHFz/cfyIUxuoHkvQM8BcchcVg9Wqlw+hYCY9HPtkuCcpq1YsyKHuwK
 `;
 
 const manifest = `{
   "name": "My App",
-  "description": "A great app!",
-  "moz-uuid": "some-uuid",
+  "moz-resources": [
+    {
+      "src": "page2.html",
+      "integrity": "JREF3JbXGvZ+I1KHtoz3f46ZkeIPrvXtG4VyFQrJ7II="
+    },
+    {
+      "src": "index.html",
+      "integrity": "B5Phw8L1tpyRBkI0gwg/evy1fgtMlMq3BIY3Q8X0rYU="
+    },
+    {
+      "src": "scripts/script.js",
+      "integrity": "6TqtNArQKrrsXEQWu3D9ZD8xvDRIkhyV6zVdTcmsT5Q="
+    },
+    {
+      "src": "scripts/library.js",
+      "integrity": "TN2ByXZiaBiBCvS4MeZ02UyNi44vED+KjdjLInUl4o8="
+    }
+  ],
   "moz-permissions": [
     {
       "systemXHR": {
@@ -19,27 +35,10 @@ const manifest = `{
       }
     }
   ],
-  "moz-resources": [
-    {
-      "src": "/index.html",
-      "integrity": "sha256-kass...eoirW-e"
-    },
-    {
-      "src": "/page2.html",
-      "integrity": "sha256-kasguie...ngeW-e"
-    },
-    {
-      "src": "/script.js",
-      "integrity": "sha256-agjdia2...wgda"
-    },
-    {
-      "src": "/library.js",
-       "integrity": "sha256-geijfi...ae3W"
-    }
-  ],
-  "moz-package-location": "https://example.com/myapp/app.pak"
-}
-`;
+  "moz-uuid": "some-uuid",
+  "moz-package-location": "https://example.com/myapp/app.pak",
+  "description": "A great app!"
+}`;
 
 const manifest_missing_moz_resources = `{
   "name": "My App",
