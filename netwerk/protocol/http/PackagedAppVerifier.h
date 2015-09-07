@@ -7,6 +7,7 @@
 #ifndef mozilla_net_PackagedAppVerifier_h
 #define mozilla_net_PackagedAppVerifier_h
 
+#include "nsISignedPackageVerifier.h"
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
 #include "nsClassHashtable.h"
@@ -134,6 +135,8 @@ private:
   // The last computed hash value for a resource. It will be set on every
   // |EndResourceHash| call.
   nsCString mLastComputedResourceHash;
+
+  nsCOMPtr<nsISignedPackageVerifier> mVerifierUtil;
 }; // class PackagedAppVerifier
 
 } // namespace net

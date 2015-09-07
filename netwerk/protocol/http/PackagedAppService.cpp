@@ -299,10 +299,10 @@ PackagedAppService::CacheEntryWriter::OnStartRequest(nsIRequest *aRequest,
     return rv;
   }
 
-  rv = CopyHeadersFromChannel(baseChannel, responseHead);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
+  //rv = CopyHeadersFromChannel(baseChannel, responseHead);
+  //if (NS_FAILED(rv)) {
+    //return rv;
+  //}
 
   nsAutoCString head;
   responseHead->Flatten(head, true);
