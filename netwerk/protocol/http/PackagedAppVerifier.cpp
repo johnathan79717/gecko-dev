@@ -113,6 +113,11 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
     mSignature.Assign(kTestingSignature);
     mManifest.Assign(kTestingManifest);
   //}
+  nsresult rv;
+  mVerifierUtil = do_CreateInstance(NS_SIGNEDPACKAGEVERIFIER_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    LOG(("create verifier failed"));
+  }
 
   return NS_OK;
 }
@@ -224,16 +229,8 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
 
   // TODO: Implement manifest verification.
   LOG(("Manifest verification not implemented yet. See Bug 1178518."));
-  nsresult rv;
-  nsCOMPtr<nsISignedPackageVerifier> verifier =
-    do_CreateInstance(NS_SIGNEDPACKAGEVERIFIER_CONTRACTID, &rv);
-  if (NS_FAILED(rv)) {
-    LOG(("create verifier failed"));
-    OnManifestVerified(aInfo, false);
-    return;
-  }
   bool success;
-  rv = verifier->VerifyManifest(mSignature, mManifest, &success);
+  nsresult rv = mVerifierUtil->VerifyManifest(mSignature, mManifest, &success);
   if (NS_FAILED(rv)) {
     LOG(("error in verification"));
     OnManifestVerified(aInfo, false);
