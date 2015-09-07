@@ -40,9 +40,9 @@ static const size_t NON_INCREMENTAL_MARK_STACK_BASE_CAPACITY = 4096;
 static const size_t INCREMENTAL_MARK_STACK_BASE_CAPACITY = 32768;
 
 /*
- * When the native stack is low, the GC does not call JS_TraceChildren to mark
+ * When the native stack is low, the GC does not call js::TraceChildren to mark
  * the reachable "children" of the thing. Rather the thing is put aside and
- * JS_TraceChildren is called later with more space on the C stack.
+ * js::TraceChildren is called later with more space on the C stack.
  *
  * To implement such delayed marking of the children with minimal overhead for
  * the normal case of sufficient native stack, the code adds a field per arena.
@@ -426,7 +426,7 @@ ToMarkable(Cell* cell)
 MOZ_ALWAYS_INLINE bool
 IsNullTaggedPointer(void* p)
 {
-    return uintptr_t(p) <= LargestTaggedNullCellPointer;
+    return uintptr_t(p) < 32;
 }
 
 // HashKeyRef represents a reference to a HashMap key. This should normally
