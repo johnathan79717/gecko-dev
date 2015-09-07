@@ -1020,6 +1020,15 @@ nsNSSCertificateDB::VerifySignedManifestAsync(
   return task->Dispatch("SignedManifest");
 }
 
+NS_IMETHODIMP
+nsNSSCertificateDB::VerifySignedManifestSync(
+  AppTrustedRoot aTrustedRoot, nsIInputStream* aManifestStream,
+  nsIInputStream* aSignatureStream, nsIX509Cert** aSignerCert)
+{
+  nsresult aRv = VerifySignedManifest(aTrustedRoot, aManifestStream,
+                              aSignatureStream, aSignerCert);
+  return NS_OK;
+}
 
 //
 // Signature verification for archives unpacked into a file structure

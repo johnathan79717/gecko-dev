@@ -16,6 +16,7 @@ XPIDL_SOURCES += [
     'nsIHttpEventSink.idl',
     'nsIHttpHeaderVisitor.idl',
     'nsIHttpProtocolHandler.idl',
+    'nsISignedPackageVerifier.idl',
 ]
 
 XPIDL_MODULE = 'necko_http'
@@ -110,4 +111,9 @@ FINAL_LIBRARY = 'xul'
 LOCAL_INCLUDES += [
     '/dom/base',
     '/netwerk/base',
+]
+
+EXTRA_COMPONENTS += [
+    'SignedPackageVerifier.js',
+    'SignedPackageVerifier.manifest',
 ]

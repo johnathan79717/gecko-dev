@@ -115,6 +115,9 @@ private:
   // The signature of the package.
   nsCString mSignature;
 
+  // The app manifest of the package.
+  nsCString mManifest;
+
   // Whether this package app is signed.
   bool mIsPackageSigned;
 
