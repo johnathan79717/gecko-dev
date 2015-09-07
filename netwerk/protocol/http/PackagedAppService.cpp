@@ -562,6 +562,8 @@ PackagedAppService::PackagedAppDownloader::OnError(EErrorType aError)
 {
   // TODO: Handler verification error properly.
   LOG(("PackagedAppDownloader::OnError > %d", aError));
+
+  FinalizeDownload(NS_ERROR_SIGNED_APP_MANIFEST_INVALID);
 }
 
 void

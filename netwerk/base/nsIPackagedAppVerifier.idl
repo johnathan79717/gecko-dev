@@ -20,7 +20,7 @@ interface nsIPackagedAppVerifierListener;
 [scriptable, uuid(16419a80-4cc3-11e5-b970-0800200c9a66)]
 interface nsIPackagedAppVerifier : nsIStreamListener
 {
-  // The package origin of either signed or unsigned package.
+  // The package origin of either a signed or unsigned package.
   readonly attribute ACString packageOrigin;
 
   // Whether this package is signed.
@@ -66,7 +66,7 @@ interface nsIPackagedAppVerifier : nsIStreamListener
    * @param aIsLastPart
    *    whether this resource is the last one in the package.
    *
-   * Create a object that we will pass to the verifier as a user context
+   * Create an object that we will pass to the verifier as a user context
    * through onStartRequest. The main purpose of this function is to make
    * nsIPackagedAppVerifier xpcshell-testable. See test_packaged_app_verifier.js.
    *
