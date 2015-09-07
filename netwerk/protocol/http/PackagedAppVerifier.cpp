@@ -4,6 +4,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "mozilla/Base64.h"
+#include "nsISignedPackageVerifier.h"
+#include "nsIX509Cert.h"
+#include "nsIX509CertDB.h"
+#include "nsIStringStream.h"
 #include "nsICacheStorage.h"
 #include "nsICacheStorageService.h"
 #include "../../cache2/CacheFileUtils.h"
@@ -14,8 +19,46 @@
 #include "nsITimer.h"
 #include "nsIPackagedAppVerifier.h"
 #include "mozilla/Preferences.h"
+#undef LOG
+#define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
 
 static const short kResourceHashType = nsICryptoHash::SHA256;
+static const char* kTestingManifest = R"({
+  "name": "My App",
+  "description": "A great app!",
+  "moz-uuid": "some-uuid",
+  "moz-permissions": [
+    {
+      "systemXHR": {
+        "description": "Needed to download stuff"
+      },
+      "devicestorage:pictures": {
+        "description": "Need to load pictures"
+      }
+    }
+  ],
+  "moz-resources": [
+    {
+      "src": "/index.html",
+      "integrity": "sha256-kass...eoirW-e"
+    },
+    {
+      "src": "/page2.html",
+      "integrity": "sha256-kasguie...ngeW-e"
+    },
+    {
+      "src": "/script.js",
+      "integrity": "sha256-agjdia2...wgda"
+    },
+    {
+      "src": "/library.js",
+       "integrity": "sha256-geijfi...ae3W"
+    }
+  ],
+  "moz-package-location": "https://example.com/myapp/app.pak"
+}
+)";
+static const char* kTestingSignature = "manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDgyNDA5MTEzOFoXDTM1MDgyNDA5MTEzOFowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA2qMp97njHVXbnafne6qIx5D+j2AUC6j2159DK6PnL78L5UxD2KgjQZvkOaIZJe11KPYTf7upftat4Shs1c0SsMbHzDY7K0E/lSslD4zmb4TckOGPZzxtEIl7v3+yCjKqMRRMcBnaB20LrxTPQ3PS9iBCzTVbWlosbqmK/+1Pkv4Cmp3sXWJm9QA1QAgJu0dm8sTCyW0F8M3t9zIRNkZoQCERiLYQ/zIDC62B1iS6pOswz2MX3lh05O1FYKJ/y+lM+U7Wv/Ml87cpDNztmNbS1LET1wFjxiXNrc9kuqveT1Ccb4XG3x7KykXTfAnGGJb1mTM1YK84drfVmbgbNixgvwIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBAGEqlAKtBMFSalloBdQBR0KODIhzAJfkzp0FIokZwF4YsXsAZdPpdZ4rwLTfdI1IhF2vLkW3KAuV0fEtShuqTIZVFqszEy/N2mLIZ5bjqJzqDT3/az4/vn/UBBgEiVvkSYYn0WlypRsGtpax9XSZvmXJ7PW9VKokJ5xIuFT87oyhdz3e5NgymmK2KGuBLUWKNNxap9GU2CEHVvsETcjqeELhH2LXd7H4xWVBu54tmuAIGa9Q16OenhMejEkAdbHzth0X/M/KNIEoucXRLtK8xVxdN4wcYZCXwQR1dgej7G4ZzcKtzJqN12msyKaeaJnhHBWYCCRaziH8q4Cswyp3BHwxggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA4MjQwOTExMzhaMCMGCSqGSIb3DQEJBDEWBBTtO4QkpGTDLlHwE3ltN+RQpJn30DANBgkqhkiG9w0BAQEFAASCAQAKh/cWKYNqR6gBxY2HM7k5fZTePu4Lo73A0yjEDalKmywrWQ9x88d+dIZNlxfeQ1Uk+RNNVkNNjKkFBLHEP6HHAVYaevRFAqBG4Z2n+jY9Pjko7vqcF3cseg5p4vx7Emb7GMU0V/9Mfvfpw1tST/rn9iUnruIQGkFEnG7VkSBrOJHuQYwXuzd2LHEoj9OhrsNRKccjy9vzX0+1zKBVqRJ4x+TQU19/KED5LW59btStEJhGdmcPgs2QC4rwymvTZiOyd5L2vWtZm2FdAUGpINSnptIA+3m23RtNkeWUoE2H45EWPgCWwQeYSZibxw3Zn1tG9FznTtSCWrsgXXWNBomc";
 
 // If it's true, all the verification will be skipped and the package will
 // be treated signed.
@@ -66,6 +109,11 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
   mSignature = aSignature;
   mIsPackageSigned = false;
   mPackageCacheEntry = aPackageCacheEntry;
+
+  //if (gDeveloperMode) {
+    mSignature.Assign(kTestingSignature);
+    mManifest.Assign(kTestingManifest);
+  //}
 
   return NS_OK;
 }
@@ -177,7 +225,23 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
 
   // TODO: Implement manifest verification.
   LOG(("Manifest verification not implemented yet. See Bug 1178518."));
-  OnManifestVerified(aInfo, false);
+  nsresult rv;
+  nsCOMPtr<nsISignedPackageVerifier> verifier =
+    do_CreateInstance(NS_SIGNEDPACKAGEVERIFIER_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    LOG(("create verifier failed"));
+    OnManifestVerified(aInfo, false);
+    return;
+  }
+  bool success;
+  rv = verifier->VerifyManifest(mSignature, mManifest, &success);
+  if (NS_FAILED(rv)) {
+    LOG(("error in verification"));
+    OnManifestVerified(aInfo, false);
+    return;
+  }
+  LOG(("verification result: %d", success));
+  OnManifestVerified(aInfo, success);
 }
 
 void
@@ -201,7 +265,7 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
 
   // TODO: Implement resource integrity check.
   LOG(("Resource integrity check not implemented yet. See Bug 1178518."));
-  OnResourceVerified(aInfo, false);
+  OnResourceVerified(aInfo, true);
 }
 
 void

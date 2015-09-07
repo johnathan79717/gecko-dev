@@ -345,15 +345,23 @@ interface nsIX509CertDB : nsISupports {
    * come from a certificate that is trusted for code signing and that
    * was issued by the given trusted root.
    *
+   * Async version:
    *  On success, NS_OK and the trusted certificate that signed the
    *  Manifest are returned.
    *
    *  On failure, an error code is returned.
+   *
+   * Sync version:
+   *  If verification fails, a null object will be returned.
+   *  Otherwise, the trusted certificate that signed the manifest will be returned
    */
   void verifySignedManifestAsync(in AppTrustedRoot trustedRoot,
                                  in nsIInputStream aManifestStream,
                                  in nsIInputStream aSignatureStream,
                                  in nsIVerifySignedManifestCallback callback);
+  nsIX509Cert verifySignedManifestSync(in AppTrustedRoot trustedRoot,
+                                       in nsIInputStream aManifestStream,
+                                       in nsIInputStream aSignatureStream);
 
   /*
    * Add a cert to a cert DB from a binary string.
