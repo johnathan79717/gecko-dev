@@ -38,5 +38,5 @@ interface nsISignedPackageVerifier : nsISupports
    * @aHashValue is the hash value of this resource named aFileName
    *   - aHashValue should be computed by the caller of this method
    */
-  boolean checkIntegrity(in AString aFileName, in AString aHashValue);
+  boolean checkIntegrity(in ACString aFileName, in ACString aHashValue);
 };

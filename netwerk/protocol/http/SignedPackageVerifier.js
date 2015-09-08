@@ -16,6 +16,13 @@ function SignedPackageVerifier() {
 
 }
 
+let DEBUG = 1
+function debug(s) {
+  if (DEBUG) {
+    dump("-*- SignedPackageVerifier: " + s + "\n");
+  }
+}
+
 SignedPackageVerifier.prototype = {
   classID: SIGNEDPACKAGEVERIFIER_CID,
   contractID: SIGNEDPACKAGEVERIFIER_CONTRACTID,
@@ -37,6 +44,7 @@ SignedPackageVerifier.prototype = {
     try {
       signature = atob(signature);
       this.resources = JSON.parse(aManifest)["moz-resources"];
+      debug(aManifest);
     } catch (e) {
       return false;
     }
@@ -65,11 +73,14 @@ SignedPackageVerifier.prototype = {
   },
 
   checkIntegrity: function(aFileName, aHashValue) {
+    debug("checkIntegrity() " + aFileName + ": " + aHashValue + "\n");
     if (!this.resources) {
+      debug("this.resource not found");
       return false;
     }
     for (let r of this.resources) {
       if (r.src === aFileName) {
+        debug("found integrity = " + r.integrity);
         return r.integrity === aHashValue;
       }
     }
