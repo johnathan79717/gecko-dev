@@ -4,10 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "mozilla/Base64.h"
 #include "nsISignedPackageVerifier.h"
-#include "nsIX509Cert.h"
-#include "nsIX509CertDB.h"
 #include "nsIStringStream.h"
 #include "nsICacheStorage.h"
 #include "nsICacheStorageService.h"
@@ -22,25 +19,27 @@
 #undef LOG
 #define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
 
+PRLogModuleInfo* gPASLog;
+
 static const short kResourceHashType = nsICryptoHash::SHA256;
 static const char* kTestingManifest = R"({
   "name": "My App",
   "moz-resources": [
     {
       "src": "page2.html",
-      "integrity": "JREF3JbXGvZ+I1KHtoz3f46ZkeIPrvXtG4VyFQrJ7II="
+      "integrity": "ooNCna2/9I7dxJiPswjH7JWsZQfiVP+OJInL71Ly3nM="
     },
     {
       "src": "index.html",
-      "integrity": "B5Phw8L1tpyRBkI0gwg/evy1fgtMlMq3BIY3Q8X0rYU="
+      "integrity": "u1u1oJavkMUD+txXALMYU7LV/zpFM6tknN0PBxcVRYo="
     },
     {
       "src": "scripts/script.js",
-      "integrity": "6TqtNArQKrrsXEQWu3D9ZD8xvDRIkhyV6zVdTcmsT5Q="
+      "integrity": "E4DNKdFUILE3BSrin61onQdv8borXA3i6ysN43opeJk="
     },
     {
       "src": "scripts/library.js",
-      "integrity": "TN2ByXZiaBiBCvS4MeZ02UyNi44vED+KjdjLInUl4o8="
+      "integrity": "6p2kgV6AE5J7iHX8DhJSSVMAYmCv1YiZpkWW5B44RyM="
     }
   ],
   "moz-permissions": [
@@ -57,7 +56,7 @@ static const char* kTestingManifest = R"({
   "moz-package-location": "https://example.com/myapp/app.pak",
   "description": "A great app!"
 })";
-static const char* kTestingSignature = "manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDkwNzA5MzU0OVoXDTM1MDkwNzA5MzU0OVowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA3UfgRY0p4F0shg3ArwvKjTUVnHTlD6ipUeJa3KLXejmp7pi37AlsYNba1lbcynoIYzK/jg+8PsTcFJHiVSrSV9ihNGPC40bKM9x5kEwYOHkBSnszMatYAa7bTwcHe90aiUolSvhmO37Tj1c3g1cKAYNEY6cYk0u3n6iN8EnqhETzfBlpLVVaQcEwspcSFNvkm8r0GU0vldVz6Xfsnw5zfq1nkQ1Pri1Y4SV5S3sPNuWQa/7wQmmGmBnckQhtk9Jga8ymOqINaf0GBrSk++YQf5CTuMjrmjnH0813YuC/QHP2pKVrxSl9vVJyt0226jCe+7ZEm8C3XPpU2mRmMMyaYQIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBACP9RcwB8xbI/4JUvPO2i5UXkYTek+uczG6URqoSuug9PhuIdHcBeUQG3BAmpj2hF8LxzEAlChesKGPKhCXKYDzy+8T1MkYQzruAx7w0xVJ4NE+4L1PJKT5zfO7NBcGTaYmVwT79arAAha1p+gH8w5JgEK5CueBzospNaRek+JW9FmtGrn+WjtMwlYbEx/w9IYByQsCqGqKaqrIFromr6S++h8BSagyqo6xc5YMp43KVzAm/vio9lCKcpUGxm6+3sosbOd32jX7zg9+Cq1MR6PmUkOWv+KPTL+/5CfNNQ4OGMbM3bmOvpZjPoDAMi9IRKl4Bvic4XBBoQi+58RkDdHExggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA5MDcwOTM2NTlaMCMGCSqGSIb3DQEJBDEWBBSaNkK4BAXiE028nDHLnPO4y5V6SDANBgkqhkiG9w0BAQEFAASCAQA/nq+X1eJAUhMdiBu1UnQPF7xvze3I/Dro7I1Cvfy2pgj9CDpfgqV0Q0jbxxv76IHtcC4RJCKl+jbOZSpOW95rWqtlXjSfwmrAXB8n5E40fHMc67tclj1MEHEvRT0Fsitiksl79/f460XVdtDdG82SKpgXHGGxVX/PcsfOuPc4RrT7DU8Fmb1XTcbbtyRVSqRUNznz8xJpIUGP3DqvA/7XkquqGye650nIT5P9LLMpXl/4IiDYQzp7bLY8G+B7FM8LFk8EAajwHfDw3CX56HT3p+AT7Ho/GQHFz/cfyIUxuoHkvQM8BcchcVg9Wqlw+hYCY9HPtkuCcpq1YsyKHuwK";
+static const char* kTestingSignature = "manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDkwNzA5MzU0OVoXDTM1MDkwNzA5MzU0OVowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA3UfgRY0p4F0shg3ArwvKjTUVnHTlD6ipUeJa3KLXejmp7pi37AlsYNba1lbcynoIYzK/jg+8PsTcFJHiVSrSV9ihNGPC40bKM9x5kEwYOHkBSnszMatYAa7bTwcHe90aiUolSvhmO37Tj1c3g1cKAYNEY6cYk0u3n6iN8EnqhETzfBlpLVVaQcEwspcSFNvkm8r0GU0vldVz6Xfsnw5zfq1nkQ1Pri1Y4SV5S3sPNuWQa/7wQmmGmBnckQhtk9Jga8ymOqINaf0GBrSk++YQf5CTuMjrmjnH0813YuC/QHP2pKVrxSl9vVJyt0226jCe+7ZEm8C3XPpU2mRmMMyaYQIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBACP9RcwB8xbI/4JUvPO2i5UXkYTek+uczG6URqoSuug9PhuIdHcBeUQG3BAmpj2hF8LxzEAlChesKGPKhCXKYDzy+8T1MkYQzruAx7w0xVJ4NE+4L1PJKT5zfO7NBcGTaYmVwT79arAAha1p+gH8w5JgEK5CueBzospNaRek+JW9FmtGrn+WjtMwlYbEx/w9IYByQsCqGqKaqrIFromr6S++h8BSagyqo6xc5YMp43KVzAm/vio9lCKcpUGxm6+3sosbOd32jX7zg9+Cq1MR6PmUkOWv+KPTL+/5CfNNQ4OGMbM3bmOvpZjPoDAMi9IRKl4Bvic4XBBoQi+58RkDdHExggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA5MDcxNDEyNDJaMCMGCSqGSIb3DQEJBDEWBBRy5Zzewq4/nO8BV7jjfgbRZJuUUjANBgkqhkiG9w0BAQEFAASCAQAbXO32zhVs1GKNWsV6KfKpsccrmV8kuZefYmQyZf8mwUH3RaytA9+Oi8a5OCyfaijeOhhDwj9YAOSOwjBAdrTRBAHOyIyyJOk5yqdl5s6czA9UoFrcHriBaayrGcqvUmCnnRYJVNbxLe4Nx4CADtY8NZDb3Iz8P+4yjBtn7wEz+j+XTjrCuQmsssOJZHx5pDhhpYUfDIfTrxg4oQrh5eDO4CwBro6JPaTclqg+uQEjH4GyaZkLOTE0H4w7wq5SNC1MYhfjPK5fzVeH4ZlMSrNnU5/ogtATShqMHF3ArpGGRExMrrgWjvpUFBI9wSB3Ttz/dNgxlV0sje8C6PMphOu8";
 
 // If it's true, all the verification will be skipped and the package will
 // be treated signed.
@@ -227,8 +226,6 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
     return;
   }
 
-  // TODO: Implement manifest verification.
-  LOG(("Manifest verification not implemented yet. See Bug 1178518."));
   bool success;
   nsresult rv = mVerifierUtil->VerifyManifest(mSignature, mManifest, &success);
   if (NS_FAILED(rv)) {
@@ -261,7 +258,22 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
 
   // TODO: Implement resource integrity check.
   LOG(("Resource integrity check not implemented yet. See Bug 1178518."));
-  OnResourceVerified(aInfo, true);
+  nsCString path;
+  aInfo->mURI->GetPath(path);
+
+  // Cut the part before and including "!//"
+  uint32_t index = path.Find("!//");
+  if (index + 3 >= path.Length()) {
+    LOG(("Invalid URI"));
+    OnResourceVerified(aInfo, false);
+    return;
+  }
+  path.Cut(0, index + 3);
+  bool success;
+  mVerifierUtil->CheckIntegrity(path, mLastComputedResourceHash, &success);
+  LOG(("CheckIntegrity %s %d", path.get(), success));
+
+  OnResourceVerified(aInfo, success);
 }
 
 void
