@@ -225,16 +225,8 @@ CreateSharedStringStream(const char* aData, uint32_t aCount)
 static bool
 GetOriginalResponseHeader(nsIRequest* aRequest, nsACString& aHeader)
 {
-  // TODO: The flattened http header might be different from the original.
-  //       See Bug 1198669 for further information.
-
-  nsCOMPtr<nsIResponseHeadProvider> headerProvider(do_QueryInterface(aRequest));
-  nsHttpResponseHead *responseHead = headerProvider->GetResponseHead();
-  NS_ENSURE_TRUE(responseHead, false);
-
-  responseHead->Flatten(aHeader, true);
-  aHeader.Append("\r\n");
-
+  nsCOMPtr<nsIMultiPartChannel> multiPartChannel(do_QueryInterface(aRequest));
+  multiPartChannel->GetOriginalResponseHeader(aHeader);
   return true;
 }
 
