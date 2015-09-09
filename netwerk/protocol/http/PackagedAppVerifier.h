@@ -121,12 +121,6 @@ private:
   nsCString mPackageOrigin;
 
   // The signature of the package.
-  nsCString mTestingSignature;
-
-  // The app manifest of the package.
-  nsCString mTestingManifest;
-
-  // The signature of the package.
   nsCString mSignature;
 
   // The app manifest of the package.
