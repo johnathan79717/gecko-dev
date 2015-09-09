@@ -30,17 +30,20 @@ SignedPackageVerifier.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsISignedPackageVerifier]),
 
   verifyManifest: function(aHeader, aManifest) {
+    debug("Manifest Length: " + aManifest.length);
     let signature;
     const signatureField = "manifest-signature: ";
-    for (let item of aHeader.split('\n')) {
+    for (let item of aHeader.split('\r\n')) {
       if (item.substr(0, signatureField.length) == signatureField) {
         signature = item.substr(signatureField.length);
         break;
       }
     }
     if (!signature) {
+      debug("No Signature");
       return false;
     }
+    debug("Signature: " + signature);
     try {
       signature = atob(signature);
       this.resources = JSON.parse(aManifest)["moz-resources"];

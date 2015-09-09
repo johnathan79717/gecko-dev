@@ -97,6 +97,13 @@ private:
   //
   void ProcessResourceCache(const ResourceCacheInfo* aInfo);
 
+  static NS_METHOD WriteManifest(nsIInputStream *aStream,
+                          void *aClosure,
+                          const char *aFromRawSegment,
+                          uint32_t aToOffset,
+                          uint32_t aCount,
+                          uint32_t *aWriteCount);
+
   // This two functions would call the actual verifier.
   void VerifyManifest(const ResourceCacheInfo* aInfo);
   void VerifyResource(const ResourceCacheInfo* aInfo);
@@ -114,10 +121,19 @@ private:
   nsCString mPackageOrigin;
 
   // The signature of the package.
+  nsCString mTestingSignature;
+
+  // The app manifest of the package.
+  nsCString mTestingManifest;
+
+  // The signature of the package.
   nsCString mSignature;
 
   // The app manifest of the package.
   nsCString mManifest;
+
+  //
+  bool mIsFirstResource;
 
   // Whether this package app is signed.
   bool mIsPackageSigned;

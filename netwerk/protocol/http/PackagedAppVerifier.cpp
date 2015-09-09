@@ -56,7 +56,7 @@ static const char* kTestingManifest = R"({
   "moz-package-location": "https://example.com/myapp/app.pak",
   "description": "A great app!"
 })";
-static const char* kTestingSignature = "manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDkwNzA5MzU0OVoXDTM1MDkwNzA5MzU0OVowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA3UfgRY0p4F0shg3ArwvKjTUVnHTlD6ipUeJa3KLXejmp7pi37AlsYNba1lbcynoIYzK/jg+8PsTcFJHiVSrSV9ihNGPC40bKM9x5kEwYOHkBSnszMatYAa7bTwcHe90aiUolSvhmO37Tj1c3g1cKAYNEY6cYk0u3n6iN8EnqhETzfBlpLVVaQcEwspcSFNvkm8r0GU0vldVz6Xfsnw5zfq1nkQ1Pri1Y4SV5S3sPNuWQa/7wQmmGmBnckQhtk9Jga8ymOqINaf0GBrSk++YQf5CTuMjrmjnH0813YuC/QHP2pKVrxSl9vVJyt0226jCe+7ZEm8C3XPpU2mRmMMyaYQIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBACP9RcwB8xbI/4JUvPO2i5UXkYTek+uczG6URqoSuug9PhuIdHcBeUQG3BAmpj2hF8LxzEAlChesKGPKhCXKYDzy+8T1MkYQzruAx7w0xVJ4NE+4L1PJKT5zfO7NBcGTaYmVwT79arAAha1p+gH8w5JgEK5CueBzospNaRek+JW9FmtGrn+WjtMwlYbEx/w9IYByQsCqGqKaqrIFromr6S++h8BSagyqo6xc5YMp43KVzAm/vio9lCKcpUGxm6+3sosbOd32jX7zg9+Cq1MR6PmUkOWv+KPTL+/5CfNNQ4OGMbM3bmOvpZjPoDAMi9IRKl4Bvic4XBBoQi+58RkDdHExggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA5MDkwMjIwMzJaMCMGCSqGSIb3DQEJBDEWBBSaNkK4BAXiE028nDHLnPO4y5V6SDANBgkqhkiG9w0BAQEFAASCAQDKEsETWSPf9vvm9sK1Ky8PfBRX+YKoSMbHfhHP9FeI3cR0oPTLNUoEnjw+lkFRmcd8e0sw540fDov86o6WCOuf4YU4zVgLa7Tx7e7cuMWDttoAUSZJO2Bt3VbJqEhhBcCxRGWoOA1LlsdJHNe7P1aVWzVGwLBZY4CE6xJSLUiehQTkC7z/2dk23KZ5jkDfw0uCVYlPkYhPOYdmxUBa7Q+sYBxuSDy4Ay9JGKBU6hHNHFFOD0xbKiH3yx1vRZphNBUM8MrTz6bYLBcRTUUMGwp1pSQ4VVvIP2oIS5E8tF4j9B1R9KzQa+c6gfa/g4qBHLoH0FI6ql+DSIX3odAalcsp";
+static const char* kTestingSignature = "manifest-signature: MIIF0gYJKoZIhvcNAQcCoIIFwzCCBb8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHAaCCA5wwggOYMIICgKADAgECAgECMA0GCSqGSIb3DQEBCwUAMHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBMB4XDTE1MDkwNzA5MzU0OVoXDTM1MDkwNzA5MzU0OVowdDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MSQwIgYDVQQKExtFeGFtcGxlIFRydXN0ZWQgQ29ycG9yYXRpb24xGjAYBgNVBAMTEVRydXN0ZWQgQ29ycCBDZXJ0MIIBIDANBgkqhkiG9w0BAQEFAAOCAQ0AMIIBCAKCAQEA3UfgRY0p4F0shg3ArwvKjTUVnHTlD6ipUeJa3KLXejmp7pi37AlsYNba1lbcynoIYzK/jg+8PsTcFJHiVSrSV9ihNGPC40bKM9x5kEwYOHkBSnszMatYAa7bTwcHe90aiUolSvhmO37Tj1c3g1cKAYNEY6cYk0u3n6iN8EnqhETzfBlpLVVaQcEwspcSFNvkm8r0GU0vldVz6Xfsnw5zfq1nkQ1Pri1Y4SV5S3sPNuWQa/7wQmmGmBnckQhtk9Jga8ymOqINaf0GBrSk++YQf5CTuMjrmjnH0813YuC/QHP2pKVrxSl9vVJyt0226jCe+7ZEm8C3XPpU2mRmMMyaYQIBA6M4MDYwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBACP9RcwB8xbI/4JUvPO2i5UXkYTek+uczG6URqoSuug9PhuIdHcBeUQG3BAmpj2hF8LxzEAlChesKGPKhCXKYDzy+8T1MkYQzruAx7w0xVJ4NE+4L1PJKT5zfO7NBcGTaYmVwT79arAAha1p+gH8w5JgEK5CueBzospNaRek+JW9FmtGrn+WjtMwlYbEx/w9IYByQsCqGqKaqrIFromr6S++h8BSagyqo6xc5YMp43KVzAm/vio9lCKcpUGxm6+3sosbOd32jX7zg9+Cq1MR6PmUkOWv+KPTL+/5CfNNQ4OGMbM3bmOvpZjPoDAMi9IRKl4Bvic4XBBoQi+58RkDdHExggH+MIIB+gIBATB4MHMxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEkMCIGA1UEChMbRXhhbXBsZSBUcnVzdGVkIENvcnBvcmF0aW9uMRkwFwYDVQQDExBUcnVzdGVkIFZhbGlkIENBAgECMAkGBSsOAwIaBQCgXTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0xNTA5MDkwMjIwMzJaMCMGCSqGSIb3DQEJBDEWBBSaNkK4BAXiE028nDHLnPO4y5V6SDANBgkqhkiG9w0BAQEFAASCAQDKEsETWSPf9vvm9sK1Ky8PfBRX+YKoSMbHfhHP9FeI3cR0oPTLNUoEnjw+lkFRmcd8e0sw540fDov86o6WCOuf4YU4zVgLa7Tx7e7cuMWDttoAUSZJO2Bt3VbJqEhhBcCxRGWoOA1LlsdJHNe7P1aVWzVGwLBZY4CE6xJSLUiehQTkC7z/2dk23KZ5jkDfw0uCVYlPkYhPOYdmxUBa7Q+sYBxuSDy4Ay9JGKBU6hHNHFFOD0xbKiH3yx1vRZphNBUM8MrTz6bYLBcRTUUMGwp1pSQ4VVvIP2oIS5E8tF4j9B1R9KzQa+c6gfa/g4qBHLoH0FI6ql+DSIX3odAalcsp\r\n";
 
 // If it's true, all the verification will be skipped and the package will
 // be treated signed.
@@ -107,11 +107,10 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
   mSignature = aSignature;
   mIsPackageSigned = false;
   mPackageCacheEntry = aPackageCacheEntry;
+  mIsFirstResource = true;
 
-  //if (gDeveloperMode) {
-    mSignature.Assign(kTestingSignature);
-    mManifest.Assign(kTestingManifest);
-  //}
+  mTestingSignature.Assign(kTestingSignature);
+  mTestingManifest.Assign(kTestingManifest);
   nsresult rv;
   mVerifierUtil = do_CreateInstance(NS_SIGNEDPACKAGEVERIFIER_CONTRACTID, &rv);
   if (NS_FAILED(rv)) {
@@ -131,6 +130,11 @@ NS_IMETHODIMP
 PackagedAppVerifier::OnStartRequest(nsIRequest *aRequest,
                                     nsISupports *aContext)
 {
+  if (mIsFirstResource) {
+    // First resource must be the manifest, we don't calculate its hash value
+    return NS_OK;
+  }
+
   if (!mHasher) {
     mHasher = do_CreateInstance("@mozilla.org/security/hash;1");
   }
@@ -142,6 +146,20 @@ PackagedAppVerifier::OnStartRequest(nsIRequest *aRequest,
   uri->GetAsciiSpec(mHashingResourceURI);
 
   return mHasher->Init(kResourceHashType);
+}
+
+NS_METHOD
+PackagedAppVerifier::WriteManifest(nsIInputStream *aStream,
+                                   void *aClosure,
+                                   const char *aFromRawSegment,
+                                   uint32_t aToOffset,
+                                   uint32_t aCount,
+                                   uint32_t *aWriteCount)
+{
+  nsCString *manifest = static_cast<nsCString*>(aClosure);
+  manifest->AppendASCII(aFromRawSegment, aCount);
+  *aWriteCount = aCount;
+  return NS_OK;
 }
 
 // @param aRequest nullptr.
@@ -156,6 +174,15 @@ PackagedAppVerifier::OnDataAvailable(nsIRequest *aRequest,
                                      uint64_t aOffset,
                                      uint32_t aCount)
 {
+  if (mIsFirstResource) {
+    // First resource must be the manifest, we don't calculate its hash value.
+    // Instead, we read from the input stream and append it to mManifest
+    uint32_t count;
+    nsresult rv = aInputStream->ReadSegments(WriteManifest, &mManifest, aCount, &count);
+    MOZ_ASSERT(count == aCount, "ReadSegments should read %d bytes", aCount);
+    return rv;
+  }
+
   MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
   NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
   return mHasher->UpdateFromStream(aInputStream, aCount);
@@ -169,13 +196,18 @@ PackagedAppVerifier::OnStopRequest(nsIRequest* aRequest,
                                     nsISupports* aContext,
                                     nsresult aStatusCode)
 {
-  NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
+  if (mIsFirstResource) {
+    // First resource must be the manifest, we don't calculate its hash value.
+    mIsFirstResource = false;
+  } else {
+    NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
 
-  nsresult rv = mHasher->Finish(true, mLastComputedResourceHash);
-  NS_ENSURE_SUCCESS(rv, rv);
+    nsresult rv = mHasher->Finish(true, mLastComputedResourceHash);
+    NS_ENSURE_SUCCESS(rv, rv);
 
-  LOG(("Hash of %s is %s", mHashingResourceURI.get(),
-                           mLastComputedResourceHash.get()));
+    LOG(("Hash of %s is %s", mHashingResourceURI.get(),
+                             mLastComputedResourceHash.get()));
+  }
 
   ProcessResourceCache(static_cast<ResourceCacheInfo*>(aContext));
 
@@ -227,7 +259,8 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
   }
 
   bool success;
-  nsresult rv = mVerifierUtil->VerifyManifest(mSignature, mManifest, &success);
+  nsresult rv = mVerifierUtil->VerifyManifest(mTestingSignature, mTestingManifest, &success);
+  //nsresult rv = mVerifierUtil->VerifyManifest(mSignature, mManifest, &success);
   if (NS_FAILED(rv)) {
     LOG(("error in verification"));
     OnManifestVerified(aInfo, false);
