@@ -7,7 +7,7 @@
 #ifndef mozilla_net_PackagedAppVerifier_h
 #define mozilla_net_PackagedAppVerifier_h
 
-#include "nsISignedPackageVerifier.h"
+#include "nsIPackagedAppUtils.h"
 #include "nsICacheEntry.h"
 #include "nsIURI.h"
 #include "nsClassHashtable.h"
@@ -146,7 +146,7 @@ private:
   // |EndResourceHash| call.
   nsCString mLastComputedResourceHash;
 
-  nsCOMPtr<nsISignedPackageVerifier> mVerifierUtil;
+  nsCOMPtr<nsIPackagedAppUtils> mPackagedAppUtils;
 }; // class PackagedAppVerifier
 
 } // namespace net

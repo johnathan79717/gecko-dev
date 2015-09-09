@@ -9,25 +9,25 @@ const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-const SIGNEDPACKAGEVERIFIER_CONTRACTID = "@mozilla.org/network/signed-package-verifier;1";
-const SIGNEDPACKAGEVERIFIER_CID = Components.ID("{fe8f1c2e-3c13-11e5-9a3f-bbf47d1e6697}");
+const PACKAGEDAPPSUTILS_CONTRACTID = "@mozilla.org/network/packaged-app-utils;1";
+const PACKAGEDAPPUTILS_CID = Components.ID("{fe8f1c2e-3c13-11e5-9a3f-bbf47d1e6697}");
 
-function SignedPackageVerifier() {
+function PackagedAppUtils() {
 
 }
 
 let DEBUG = 1
 function debug(s) {
   if (DEBUG) {
-    dump("-*- SignedPackageVerifier: " + s + "\n");
+    dump("-*- PackagedAppUtils: " + s + "\n");
   }
 }
 
-SignedPackageVerifier.prototype = {
-  classID: SIGNEDPACKAGEVERIFIER_CID,
-  contractID: SIGNEDPACKAGEVERIFIER_CONTRACTID,
-  classDescription: "Signed Package Verifier",
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsISignedPackageVerifier]),
+PackagedAppUtils.prototype = {
+  classID: PACKAGEDAPPUTILS_CID,
+  contractID: PACKAGEDAPPSUTILS_CONTRACTID,
+  classDescription: "Packaged App Utils",
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIPackagedAppUtils]),
 
   verifyManifest: function(aHeader, aManifest) {
     debug("Manifest Length: " + aManifest.length);
@@ -93,4 +93,4 @@ SignedPackageVerifier.prototype = {
   },
 };
 
-this.NSGetFactory = XPCOMUtils.generateNSGetFactory([SignedPackageVerifier]);
+this.NSGetFactory = XPCOMUtils.generateNSGetFactory([PackagedAppUtils]);

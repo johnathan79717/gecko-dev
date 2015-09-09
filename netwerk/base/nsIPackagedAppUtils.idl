@@ -6,29 +6,30 @@
 #include "nsISupports.idl"
 
 %{C++
-#define NS_SIGNEDPACKAGEVERIFIER_CONTRACTID "@mozilla.org/network/signed-package-verifier;1"
+#define NS_PACKAGEDAPPUTILS_CONTRACTID "@mozilla.org/network/packaged-app-utils;1"
 %}
 
 /**
  * A package using privileged APIs should be signed by marketplace or trust-
  * worthy developers. When Necko receives such a package, it has to
  * extract the manifest and the signature and calls verifyManifest(...) to verify
- * the manifest. An nsISignedPackagedVerifier will parse the manifest and
+ * the manifest. nsIPackagedAppUtils will parse the manifest and
  * store the hash values of each resource. When a resource is ready, Necko
  * will calculate its hash value (including the header like Content-Location: xxx),
  * and calls checkIntegrity(...) to verify the integrity.
  *
  * For more detail:
- *   https://wiki.mozilla.org/User:Ptheriault/Packagedprivilegedcontent
+ *   https://wiki.mozilla.org/FirefoxOS/New_security_model/Packaging
  */
 
-[scriptable, uuid(eafd2113-0dc8-4e5e-a3d8-f639635f0384)]
-interface nsISignedPackageVerifier : nsISupports
+[scriptable, uuid(e2cf4b8f-7f3e-416e-9c1e-a96ecd0657f1)]
+interface nsIPackagedAppUtils : nsISupports
 {
   /**
    * @aHeader is the package's header including
-   *   - "manifest-signature: xxxxxx (base64 encoding)
+   *   - "manifest-signature: xxxxxx" (base64 encoding)
    * @aManifest is the manifest of the package
+   *   - the multipart header is included
    *   - manifest must be the first resource of the package
    */
   boolean verifyManifest(in ACString aHeader, in ACString aManifest);

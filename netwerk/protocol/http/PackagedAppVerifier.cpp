@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "nsISignedPackageVerifier.h"
+#include "nsIPackagedAppUtils.h"
 #include "nsIStringStream.h"
 #include "nsICacheStorage.h"
 #include "nsICacheStorageService.h"
@@ -74,7 +74,7 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
   mIsFirstResource = true;
 
   nsresult rv;
-  mVerifierUtil = do_CreateInstance(NS_SIGNEDPACKAGEVERIFIER_CONTRACTID, &rv);
+  mPackagedAppUtils = do_CreateInstance(NS_PACKAGEDAPPUTILS_CONTRACTID, &rv);
   if (NS_FAILED(rv)) {
     LOG(("create verifier failed"));
   }
@@ -221,7 +221,7 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
   }
 
   bool success;
-  nsresult rv = mVerifierUtil->VerifyManifest(mSignature, mManifest, &success);
+  nsresult rv = mPackagedAppUtils->VerifyManifest(mSignature, mManifest, &success);
   if (NS_FAILED(rv)) {
     LOG(("error in verification"));
     OnManifestVerified(aInfo, false);
@@ -264,7 +264,7 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
   }
   path.Cut(0, index + 3);
   bool success;
-  mVerifierUtil->CheckIntegrity(path, mLastComputedResourceHash, &success);
+  mPackagedAppUtils->CheckIntegrity(path, mLastComputedResourceHash, &success);
   LOG(("CheckIntegrity %s %d", path.get(), success));
 
   OnResourceVerified(aInfo, success);
