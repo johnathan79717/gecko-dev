@@ -46,9 +46,11 @@ SignedPackageVerifier.prototype = {
     debug("Signature: " + signature);
     try {
       signature = atob(signature);
-      this.resources = JSON.parse(aManifest)["moz-resources"];
+      let manifestBody = aManifest.substr(aManifest.indexOf('\r\n\r\n') + 4);
+      this.resources = JSON.parse(manifestBody)["moz-resources"];
       debug(aManifest);
     } catch (e) {
+      debug("JSON parsing failure");
       return false;
     }
 
