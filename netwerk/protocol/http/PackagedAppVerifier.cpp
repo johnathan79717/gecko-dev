@@ -13,6 +13,7 @@
 #include "PackagedAppVerifier.h"
 #include "nsITimer.h"
 #include "nsIPackagedAppVerifier.h"
+#include "nsIPackagedAppUtils.h"
 #include "mozilla/Preferences.h"
 
 static const short kResourceHashType = nsICryptoHash::SHA256;
@@ -183,7 +184,7 @@ PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo* aInfo)
   }
 }
 
-void
+NS_IMETHODIMP
 PackagedAppVerifier::FireVerifiedEvent(bool aForManifest, bool aSuccess)
 {
   nsCOMPtr<nsIRunnable> r;
@@ -199,6 +200,8 @@ PackagedAppVerifier::FireVerifiedEvent(bool aForManifest, bool aSuccess)
   }
 
   NS_DispatchToMainThread(r);
+
+  return NS_OK;
 }
 
 void

@@ -75,6 +75,8 @@ interface nsIPackagedAppVerifier : nsIStreamListener
                                       in nsICacheEntry aCacheEntry,
                                       in nsresult aStatusCode,
                                       in boolean aIsLastPart);
+
+  void fireVerifiedEvent(in boolean aForManifest, in boolean aSuccess);
 };
 
 /**

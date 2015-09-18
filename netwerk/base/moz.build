@@ -70,6 +70,7 @@ XPIDL_SOURCES += [
     'nsIPACGenerator.idl',
     'nsIPackagedAppChannelListener.idl',
     'nsIPackagedAppService.idl',
+    'nsIPackagedAppUtils.idl',
     'nsIPackagedAppVerifier.idl',
     'nsIParentChannel.idl',
     'nsIParentRedirectingChannel.idl',

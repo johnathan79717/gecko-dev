@@ -128,9 +128,6 @@ private:
   void OnManifestVerified(bool aSuccess);
   void OnResourceVerified(bool aSuccess);
 
-  // Fire a async event to notify the verification result.
-  void FireVerifiedEvent(bool aForManifest, bool aSuccess);
-
   // To notify that either manifest or resource check is done.
   nsCOMPtr<nsIPackagedAppVerifierListener> mListener;
 
