@@ -15,6 +15,8 @@
 #include "nsIPackagedAppVerifier.h"
 #include "nsIPackagedAppUtils.h"
 #include "mozilla/Preferences.h"
+#include "nsComponentManagerUtils.h"
+#include "mozilla/RefPtr.h"
 
 static const short kResourceHashType = nsICryptoHash::SHA256;
 
@@ -25,6 +27,8 @@ static bool gDeveloperMode = false;
 namespace mozilla {
 namespace net {
 
+#undef LOG
+#define LOG(x)
 ///////////////////////////////////////////////////////////////////////////////
 
 NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier)

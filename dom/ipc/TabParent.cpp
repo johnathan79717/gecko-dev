@@ -112,6 +112,8 @@ using namespace mozilla::jsipc;
 // from the ones registered by webProgressListeners.
 #define NOTIFY_FLAG_SHIFT 16
 
+#define LOG(argv)
+
 class OpenFileAndSendFDRunnable : public nsRunnable
 {
     const nsString mPath;

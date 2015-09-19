@@ -355,6 +355,9 @@ interface nsIX509CertDB : nsISupports {
                                  in nsIInputStream aSignatureStream,
                                  in nsIVerifySignedManifestCallback callback);
 
+  nsIX509Cert verifySignedManifestSync(in AppTrustedRoot trustedRoot,
+                                       in nsIInputStream aManifestStream,
+                                       in nsIInputStream aSignatureStream);
   /*
    * Add a cert to a cert DB from a binary string.
    *
