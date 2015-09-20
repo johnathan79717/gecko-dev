@@ -123,6 +123,14 @@ private:
   //
   void ProcessResourceCache(const ResourceCacheInfo* aInfo);
 
+  // Callback for nsIInputStream::ReadSegment() to read manifest
+  static nsresult WriteManifest(nsIInputStream* aStream,
+                                void* aManifest,
+                                const char* aFromRawSegment,
+                                uint32_t aToOffset,
+                                uint32_t aCount,
+                                uint32_t* aWriteCount);
+
   // This two functions would call the actual verifier.
   void VerifyManifest(const ResourceCacheInfo* aInfo);
   void VerifyResource(const ResourceCacheInfo* aInfo);
@@ -142,6 +150,12 @@ private:
   // The signature of the package.
   nsCString mSignature;
 
+  // The app manfiest of the package
+  nsCString mManifest;
+
+  // Whether we're processing the first resource, which is the manfiest
+  bool mIsFirstResource;
+
   // Whether this package app is signed.
   bool mIsPackageSigned;
 
@@ -158,6 +172,9 @@ private:
   // The last computed hash value for a resource. It will be set on every
   // |EndResourceHash| call.
   nsCString mLastComputedResourceHash;
+
+  // This will help to verify manifests and resource integrity
+  nsCOMPtr<nsIPackagedAppUtils> mPackagedAppUtils;
 
   // A list of pending resource that is downloaded but not verified yet.
   mozilla::LinkedList<ResourceCacheInfo> mPendingResourceCacheInfoList;

@@ -17,7 +17,12 @@
 #include "mozilla/Preferences.h"
 #include "nsComponentManagerUtils.h"
 #include "mozilla/RefPtr.h"
+#include "nsIPackagedAppUtils.h"
+#include "nsIInputStream.h"
 
+PRLogModuleInfo *gPASLog;
+#undef LOG
+#define LOG(args) MOZ_LOG(gPASLog, mozilla::LogLevel::Debug, args)
 static const short kResourceHashType = nsICryptoHash::SHA256;
 
 // If it's true, all the verification will be skipped and the package will
@@ -27,8 +32,6 @@ static bool gDeveloperMode = false;
 namespace mozilla {
 namespace net {
 
-#undef LOG
-#define LOG(x)
 ///////////////////////////////////////////////////////////////////////////////
 
 NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier)
@@ -80,6 +83,14 @@ NS_IMETHODIMP PackagedAppVerifier::Init(nsIPackagedAppVerifierListener* aListene
   mSignature = aSignature;
   mIsPackageSigned = false;
   mPackageCacheEntry = aPackageCacheEntry;
+  mIsFirstResource = true;
+
+  nsresult rv;
+  mPackagedAppUtils = do_CreateInstance(NS_PACKAGEDAPPUTILS_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    LOG(("create packaged app utils failed"));
+    return rv;
+  }
 
   return NS_OK;
 }
@@ -94,6 +105,11 @@ NS_IMETHODIMP
 PackagedAppVerifier::OnStartRequest(nsIRequest *aRequest,
                                     nsISupports *aContext)
 {
+  if (mIsFirstResource) {
+    // The first resource must be the manifest, hashes not needed
+    return NS_OK;
+  }
+
   if (!mHasher) {
     mHasher = do_CreateInstance("@mozilla.org/security/hash;1");
   }
@@ -105,6 +121,22 @@ PackagedAppVerifier::OnStartRequest(nsIRequest *aRequest,
   uri->GetAsciiSpec(mHashingResourceURI);
 
   return mHasher->Init(kResourceHashType);
+}
+
+nsresult
+PackagedAppVerifier::WriteManifest(nsIInputStream* aStream,
+                                   void* aManifest,
+                                   const char* aFromRawSegment,
+                                   uint32_t aToOffset,
+                                   uint32_t aCount,
+                                   uint32_t* aWriteCount)
+{
+  LOG(("WriteManifest: length %u", aCount));
+  LOG(("%s", aFromRawSegment));
+  nsCString* manifest = static_cast<nsCString*>(aManifest);
+  manifest->AppendASCII(aFromRawSegment, aCount);
+  *aWriteCount = aCount;
+  return NS_OK;
 }
 
 // @param aRequest nullptr.
@@ -119,6 +151,16 @@ PackagedAppVerifier::OnDataAvailable(nsIRequest *aRequest,
                                      uint64_t aOffset,
                                      uint32_t aCount)
 {
+  if (mIsFirstResource) {
+    // The first resource must be the manifest, hash value not needed.
+    // Instead, we read from the input stream and append to mManifest.
+    uint32_t count;
+    LOG(("ReadSegments: size = %u", aCount));
+    nsresult rv = aInputStream->ReadSegments(WriteManifest, &mManifest, aCount, &count);
+    MOZ_ASSERT(count == aCount, "ReadSegments should read %d bytes", aCount);
+    return rv;
+  }
+
   MOZ_ASSERT(!mHashingResourceURI.IsEmpty(), "MUST call BeginResourceHash first.");
   NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
   return mHasher->UpdateFromStream(aInputStream, aCount);
@@ -132,17 +174,22 @@ PackagedAppVerifier::OnStopRequest(nsIRequest* aRequest,
                                     nsISupports* aContext,
                                     nsresult aStatusCode)
 {
-  NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
+  if (mIsFirstResource) {
+    // The first resource must be the manifest, hash value not needed.
+    mIsFirstResource = false;
+  } else {
+    NS_ENSURE_TRUE(mHasher, NS_ERROR_FAILURE);
 
-  nsAutoCString hash;
-  nsresult rv = mHasher->Finish(true, hash);
-  NS_ENSURE_SUCCESS(rv, rv);
+    nsAutoCString hash;
+    nsresult rv = mHasher->Finish(true, hash);
+    NS_ENSURE_SUCCESS(rv, rv);
 
-  LOG(("Hash of %s is %s", mHashingResourceURI.get(), hash.get()));
+    LOG(("Hash of %s is %s", mHashingResourceURI.get(), hash.get()));
 
-  // Store the computated hash associated with the resource URI.
-  mResourceHashStore.Put(mHashingResourceURI, new nsCString(hash));
-  mHashingResourceURI = EmptyCString();
+    // Store the computated hash associated with the resource URI.
+    mResourceHashStore.Put(mHashingResourceURI, new nsCString(hash));
+    mHashingResourceURI = EmptyCString();
+  }
 
   // Get a internal copy and take over the life cycle handling
   // since the linked list we use only supports pointer-based element.
@@ -229,9 +276,9 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
     return;
   }
 
-  // TODO: Implement manifest verification.
-  LOG(("Manifest verification not implemented yet. See Bug 1178518."));
-  FireVerifiedEvent(true, false);
+  LOG(("Signature: length = %u\n%s", mSignature.Length(), mSignature.get()));
+  LOG(("Manifest: length = %u\n%s", mManifest.Length(), mManifest.get()));
+  mPackagedAppUtils->VerifyManifest(mSignature, mManifest, this);
 }
 
 void
@@ -262,9 +309,15 @@ PackagedAppVerifier::VerifyResource(const ResourceCacheInfo* aInfo)
     return;
   }
 
-  // TODO: Implement resource integrity check.
-  LOG(("Resource integrity check not implemented yet. See Bug 1178518."));
-  FireVerifiedEvent(false, false);
+  uint32_t index = uriAsAscii.Find("!//");
+  if (index + 3 >= uriAsAscii.Length()) {
+    LOG(("URI parsing ERROR!"));
+    MOZ_CRASH();
+  }
+  // Only keep the part after "!//"
+  uriAsAscii.Cut(0, index + 3);
+
+  mPackagedAppUtils->CheckIntegrity(uriAsAscii, *resourceHash, this);
 }
 
 void

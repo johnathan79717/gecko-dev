@@ -225,15 +225,8 @@ CreateSharedStringStream(const char* aData, uint32_t aCount)
 static bool
 GetOriginalResponseHeader(nsIRequest* aRequest, nsACString& aHeader)
 {
-  // TODO: The flattened http header might be different from the original.
-  //       See Bug 1198669 for further information.
-
-  nsCOMPtr<nsIResponseHeadProvider> headerProvider(do_QueryInterface(aRequest));
-  nsHttpResponseHead *responseHead = headerProvider->GetResponseHead();
-  NS_ENSURE_TRUE(responseHead, false);
-
-  responseHead->Flatten(aHeader, true);
-  aHeader.Append("\r\n");
+  nsCOMPtr<nsIMultiPartChannel> multiPartChannel(do_QueryInterface(aRequest));
+  multiPartChannel->GetOriginalResponseHeader(aHeader);
 
   return true;
 }
@@ -690,6 +683,7 @@ PackagedAppService::PackagedAppDownloader::ConsumeData(nsIInputStream *aStream,
 
   self->mWriter->ConsumeData(aFromRawSegment, aCount, aWriteCount);
 
+  LOG(("ConsumeData: %u", aCount));
   nsCOMPtr<nsIInputStream> stream = CreateSharedStringStream(aFromRawSegment, aCount);
   return self->mVerifier->OnDataAvailable(nullptr, nullptr, stream, 0, aCount);
 }
@@ -702,6 +696,7 @@ PackagedAppService::PackagedAppDownloader::OnDataAvailable(nsIRequest *aRequest,
                                                            uint32_t aCount)
 {
   uint32_t n;
+  LOG(("PackagedAppService::PackagedAppDownloader::OnDataAvailable() aCount = %u", aCount));
   return aInputStream->ReadSegments(ConsumeData, this, aCount, &n);
 }
 
