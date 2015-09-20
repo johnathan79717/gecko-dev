@@ -148,6 +148,7 @@ nsEditor::nsEditor()
 ,  mDispatchInputEvent(true)
 ,  mIsInEditAction(false)
 ,  mHidingCaret(false)
+,  mObservingDictionaryUpdates(false)
 {
 }
 
@@ -307,7 +308,7 @@ nsEditor::PostCreate()
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
       obs->AddObserver(this,
-                       SPELLCHECK_DICTIONARY_UPDATE_NOTIFICATION,
+                       SPELLCHECK_DICTIONARY_REMOVE_NOTIFICATION,
                        false);
     }
   }
@@ -451,6 +452,8 @@ nsEditor::PreDestroy(bool aDestroyingFrames)
   if (obs) {
     obs->RemoveObserver(this,
                         SPELLCHECK_DICTIONARY_UPDATE_NOTIFICATION);
+    obs->RemoveObserver(this,
+                        SPELLCHECK_DICTIONARY_REMOVE_NOTIFICATION);
   }
 
   // Let spellchecker clean up its observers etc. It is important not to
@@ -1315,7 +1318,9 @@ NS_IMETHODIMP nsEditor::Observe(nsISupports* aSubj, const char *aTopic,
                                 const char16_t *aData)
 {
   NS_ASSERTION(!strcmp(aTopic,
-                       SPELLCHECK_DICTIONARY_UPDATE_NOTIFICATION),
+                       SPELLCHECK_DICTIONARY_UPDATE_NOTIFICATION) ||
+               !strcmp(aTopic,
+                       SPELLCHECK_DICTIONARY_REMOVE_NOTIFICATION),
                "Unexpected observer topic");
 
   // When mozInlineSpellChecker::CanEnableInlineSpellChecking changes
@@ -1822,7 +1827,7 @@ public:
 
     // Even if the change is caused by untrusted event, we need to dispatch
     // trusted input event since it's a fact.
-    InternalEditorInputEvent inputEvent(true, NS_EDITOR_INPUT, widget);
+    InternalEditorInputEvent inputEvent(true, eEditorInput, widget);
     inputEvent.time = static_cast<uint64_t>(PR_Now() / 1000);
     inputEvent.mIsComposing = mIsComposing;
     nsEventStatus status = nsEventStatus_eIgnore;
@@ -5200,6 +5205,29 @@ nsEditor::OnFocus(nsIDOMEventTarget* aFocusEventTarget)
   if (mInlineSpellChecker) {
     mInlineSpellChecker->UpdateCurrentDictionary();
   }
+}
+
+void
+nsEditor::StartWatchingDictionaryChanges()
+{
+  if (!mObservingDictionaryUpdates) {
+    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+    if (obs) {
+      obs->AddObserver(this, SPELLCHECK_DICTIONARY_UPDATE_NOTIFICATION, false);
+    }
+    mObservingDictionaryUpdates = true;
+  }
+}
+
+void
+nsEditor::StopWatchingDictionaryChanges()
+{
+  // Removing an observer that wasn't added doesn't cause any harm.
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  if (obs) {
+    obs->RemoveObserver(this, SPELLCHECK_DICTIONARY_UPDATE_NOTIFICATION);
+  }
+  mObservingDictionaryUpdates = false;
 }
 
 NS_IMETHODIMP

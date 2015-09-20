@@ -24,6 +24,8 @@ EnsureOperandNotFloat32(TempAllocator& alloc, MInstruction* def, unsigned op)
     if (in->type() == MIRType_Float32) {
         MToDouble* replace = MToDouble::New(alloc, in);
         def->block()->insertBefore(def, replace);
+        if (def->isRecoveredOnBailout())
+            replace->setRecoveredOnBailout();
         def->replaceOperand(op, replace);
     }
 }
@@ -491,7 +493,7 @@ bool
 DoublePolicy<Op>::staticAdjustInputs(TempAllocator& alloc, MInstruction* def)
 {
     MDefinition* in = def->getOperand(Op);
-    if (in->type() == MIRType_Double)
+    if (in->type() == MIRType_Double || in->type() == MIRType_SinCosDouble)
         return true;
 
     MToDouble* replace = MToDouble::New(alloc, in);

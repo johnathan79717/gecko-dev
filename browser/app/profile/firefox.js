@@ -1747,6 +1747,9 @@ pref("security.mixed_content.block_active_content", true);
 // 1 = allow MITM for certificate pinning checks.
 pref("security.cert_pinning.enforcement_level", 1);
 
+// 2 = allow SHA-1 only before 2016-01-01
+pref("security.pki.sha1_enforcement_level", 2);
+
 // Required blocklist freshness for OneCRL OCSP bypass
 // (default is 1.25x extensions.blocklist.interval, or 30 hours)
 pref("security.onecrl.maximum_staleness_in_seconds", 108000);
@@ -1937,10 +1940,10 @@ pref("view_source.tab", true);
 #endif
 
 // Enable ServiceWorkers for Push API consumers.
-// Interception is still disabled.
+// Interception is still disabled on beta and release.
 pref("dom.serviceWorkers.enabled", true);
 
-#ifdef NIGHTLY_BUILD
+#ifndef RELEASE_BUILD
 pref("dom.serviceWorkers.interception.enabled", true);
 #endif
 

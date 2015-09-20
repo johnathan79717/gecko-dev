@@ -573,7 +573,7 @@ Process(JSContext* cx, const char* filename, bool forceTTY)
             return;
         }
     }
-    AutoCloseInputFile autoClose(file);
+    AutoCloseFile autoClose(file);
 
     if (!forceTTY && !isatty(fileno(file))) {
         // It's not interactive - just execute it.
@@ -664,7 +664,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
                              JSSMSG_CANT_OPEN, filename.ptr(), strerror(errno));
         return false;
     }
-    AutoCloseInputFile autoClose(file);
+    AutoCloseFile autoClose(file);
 
     if (!sizeGiven) {
         struct stat st;
@@ -1294,7 +1294,7 @@ js::shell::FileAsString(JSContext* cx, const char* pathname)
         JS_ReportError(cx, "can't open %s: %s", pathname, strerror(errno));
         return nullptr;
     }
-    AutoCloseInputFile autoClose(file);
+    AutoCloseFile autoClose(file);
 
     if (fseek(file, 0, SEEK_END) != 0) {
         JS_ReportError(cx, "can't seek end of %s", pathname);
@@ -3400,7 +3400,7 @@ runOffThreadScript(JSContext* cx, unsigned argc, Value* vp)
     return JS_ExecuteScript(cx, script, args.rval());
 }
 
-struct FreeOnReturn
+struct MOZ_RAII FreeOnReturn
 {
     JSContext* cx;
     const char* ptr;
@@ -5918,6 +5918,15 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
             return OptionFailure("ion-range-analysis", str);
     }
 
+    if (const char *str = op.getStringOption("ion-sincos")) {
+        if (strcmp(str, "on") == 0)
+            jit::js_JitOptions.disableSincos = false;
+        else if (strcmp(str, "off") == 0)
+            jit::js_JitOptions.disableSincos = true;
+        else
+            return OptionFailure("ion-sincos", str);
+    }
+
     if (const char* str = op.getStringOption("ion-sink")) {
         if (strcmp(str, "on") == 0)
             jit::js_JitOptions.disableSink = false;
@@ -6256,6 +6265,13 @@ main(int argc, char** argv, char** envp)
                                "Find edge cases where Ion can avoid bailouts (default: on, off to disable)")
         || !op.addStringOption('\0', "ion-range-analysis", "on/off",
                                "Range analysis (default: on, off to disable)")
+#if defined(__APPLE__)
+        || !op.addStringOption('\0', "ion-sincos", "on/off",
+                               "Replace sin(x)/cos(x) to sincos(x) (default: on, off to disable)")
+#else
+        || !op.addStringOption('\0', "ion-sincos", "on/off",
+                               "Replace sin(x)/cos(x) to sincos(x) (default: off, on to enable)")
+#endif
         || !op.addStringOption('\0', "ion-sink", "on/off",
                                "Sink code motion (default: off, on to enable)")
         || !op.addStringOption('\0', "ion-loop-unrolling", "on/off",
