@@ -29,7 +29,7 @@ PackagedAppUtils.prototype = {
   classDescription: "Packaged App Utils",
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIPackagedAppUtils]),
 
-  verifyManifest: function(aHeader, aManifest, aVerifier) {
+  verifyManifest: function(aHeader, aManifest, aCallback) {
     debug("Manifest: " + aManifest);
 
     // parse signature from header
@@ -43,7 +43,7 @@ PackagedAppUtils.prototype = {
     }
     if (!signature) {
       debug("No signature in header");
-      aVerifier.fireVerifiedEvent(true, false);
+      aCallback.fireVerifiedEvent(true, false);
       return;
     }
     debug("Signature: " + signature);
@@ -60,7 +60,7 @@ PackagedAppUtils.prototype = {
       this.resources = JSON.parse(manifestBody)["moz-resources"];
     } catch (e) {
       debug("JSON parsing failure");
-      aVerifier.fireVerifiedEvent(true, false);
+      aCallback.fireVerifiedEvent(true, false);
       return;
     }
 
@@ -84,25 +84,25 @@ PackagedAppUtils.prototype = {
     certDb.verifySignedManifestAsync(
       Ci.nsIX509CertDB.PrivilegedPackageRoot, manifestStream, signatureStream,
       function(aRv, aCert) {
-        aVerifier.fireVerifiedEvent(true, Components.isSuccessCode(aRv));
+        aCallback.fireVerifiedEvent(true, Components.isSuccessCode(aRv));
       });
   },
 
-  checkIntegrity: function(aFileName, aHashValue, aVerifier) {
+  checkIntegrity: function(aFileName, aHashValue, aCallback) {
     debug("checkIntegrity() " + aFileName + ": " + aHashValue + "\n");
     if (!this.resources) {
       debug("resource hashes not found");
-      aVerifier.fireVerifiedEvent(false, false);
+      aCallback.fireVerifiedEvent(false, false);
       return;
     }
     for (let r of this.resources) {
       if (r.src === aFileName) {
         debug("found integrity = " + r.integrity);
-        aVerifier.fireVerifiedEvent(false, r.integrity === aHashValue);
+        aCallback.fireVerifiedEvent(false, r.integrity === aHashValue);
         return;
       }
     }
-    aVerifier.fireVerifiedEvent(false, false);
+    aCallback.fireVerifiedEvent(false, false);
   },
 };
 

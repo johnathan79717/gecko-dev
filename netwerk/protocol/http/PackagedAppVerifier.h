@@ -20,12 +20,14 @@ namespace net {
 
 class PackagedAppVerifier final
   : public nsIPackagedAppVerifier
+  , public nsIVerificationCallback
 {
 public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER
   NS_DECL_NSIPACKAGEDAPPVERIFIER
+  NS_DECL_NSIVERIFICATIONCALLBACK
 
 public:
   enum EState {

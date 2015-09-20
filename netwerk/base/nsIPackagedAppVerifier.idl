@@ -5,6 +5,7 @@
 
 #include "nsISupports.idl"
 #include "nsIStreamListener.idl"
+#include "nsIPackagedAppUtils.idl"
 
 interface nsIURI;
 interface nsICacheEntry;
@@ -75,8 +76,6 @@ interface nsIPackagedAppVerifier : nsIStreamListener
                                       in nsICacheEntry aCacheEntry,
                                       in nsresult aStatusCode,
                                       in boolean aIsLastPart);
-
-  void fireVerifiedEvent(in boolean aForManifest, in boolean aSuccess);
 };
 
 /**

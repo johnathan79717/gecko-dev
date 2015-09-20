@@ -37,7 +37,7 @@ interface nsIPackagedAppUtils : nsISupports
    */
   void verifyManifest(in ACString aHeader,
                       in ACString aManifest,
-                      in nsIPackagedAppVerifier aVerifier);
+                      in nsIVerificationCallback aVerifier);
 
   /**
    * @aFileName is the name of a resource in the package
@@ -46,6 +46,12 @@ interface nsIPackagedAppUtils : nsISupports
    */
   void checkIntegrity(in ACString aFileName,
                       in ACString aHashValue,
-                      in nsIPackagedAppVerifier aVerifier);
+                      in nsIVerificationCallback aVerifier);
 };
 
+[scriptable, uuid(c25da389-2918-4934-83a6-e0889591dc21)]
+interface nsIVerificationCallback : nsISupports
+{
+  void fireVerifiedEvent(in boolean aForManifest,
+                         in boolean aSuccess);
+};
