@@ -34,7 +34,7 @@ namespace net {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier)
+NS_IMPL_ISUPPORTS(PackagedAppVerifier, nsIPackagedAppVerifier, nsIVerificationCallback)
 
 NS_IMPL_ISUPPORTS(PackagedAppVerifier::ResourceCacheInfo, nsISupports)
 
@@ -238,6 +238,7 @@ PackagedAppVerifier::ProcessResourceCache(const ResourceCacheInfo* aInfo)
 NS_IMETHODIMP
 PackagedAppVerifier::FireVerifiedEvent(bool aForManifest, bool aSuccess)
 {
+  LOG(("FireVerifiedEvent aForManifest=%d aSuccess=%d", aForManifest, aSuccess));
   nsCOMPtr<nsIRunnable> r;
 
   if (aForManifest) {
@@ -278,7 +279,12 @@ PackagedAppVerifier::VerifyManifest(const ResourceCacheInfo* aInfo)
 
   LOG(("Signature: length = %u\n%s", mSignature.Length(), mSignature.get()));
   LOG(("Manifest: length = %u\n%s", mManifest.Length(), mManifest.get()));
-  mPackagedAppUtils->VerifyManifest(mSignature, mManifest, this);
+  //nsresult rv = mPackagedAppUtils->VerifyManifest(mSignature, mManifest);
+  //nsCOMPtr<nsIVerificationCallback> callback = do_QueryInterface(this);
+  nsresult rv = mPackagedAppUtils->VerifyManifest(mSignature, mManifest, this);
+  if (NS_FAILED(rv)) {
+    LOG(("VerifyManifest FAILED rv = %u", (unsigned)rv));
+  }
 }
 
 void

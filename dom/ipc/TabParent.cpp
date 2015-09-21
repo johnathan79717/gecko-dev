@@ -453,7 +453,7 @@ TabParent::ShouldSwitchProcess(nsIChannel* aChannel)
 
   // The content policy type is used to check if the loading resource
   // is a subresource in a document.
-  nsContentPolicyType contentPolicyType = loadInfo->GetContentPolicyType();
+  loadInfo->GetContentPolicyType();
 
   // Get the loading origin.
   nsCOMPtr<nsIPrincipal> loadingPrincipal;

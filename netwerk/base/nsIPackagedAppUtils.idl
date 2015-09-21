@@ -6,7 +6,6 @@
 #include "nsISupports.idl"
 
 interface nsIVerificationCallback;
-interface nsIPackagedAppVerifier;
 
 %{C++
 #define NS_PACKAGEDAPPUTILS_CONTRACTID "@mozilla.org/network/packaged-app-utils;1"
@@ -25,7 +24,7 @@ interface nsIPackagedAppVerifier;
  *   https://wiki.mozilla.org/FirefoxOS/New_security_model/Packaging
  */
 
-[scriptable, uuid(e2cf4b8f-7f3e-416e-9c1e-a96ecd0657f1)]
+[scriptable, uuid(d0a98a69-a215-4cf9-abb3-7a0b9237cd27)]
 interface nsIPackagedAppUtils : nsISupports
 {
   /**
@@ -49,7 +48,7 @@ interface nsIPackagedAppUtils : nsISupports
                       in nsIVerificationCallback aVerifier);
 };
 
-[scriptable, uuid(c25da389-2918-4934-83a6-e0889591dc21)]
+[scriptable, uuid(e1912028-93e5-4378-aa3f-a58702937169)]
 interface nsIVerificationCallback : nsISupports
 {
   void fireVerifiedEvent(in boolean aForManifest,

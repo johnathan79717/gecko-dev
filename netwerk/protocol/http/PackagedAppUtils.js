@@ -9,14 +9,14 @@ const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-const PACKAGEDAPPSUTILS_CONTRACTID = "@mozilla.org/network/packaged-app-utils;1";
+const PACKAGEDAPPUTILS_CONTRACTID = "@mozilla.org/network/packaged-app-utils;1";
 const PACKAGEDAPPUTILS_CID = Components.ID("{fe8f1c2e-3c13-11e5-9a3f-bbf47d1e6697}");
 
 function PackagedAppUtils() {
 
 }
 
-let DEBUG = 1
+let DEBUG = 0
 function debug(s) {
   if (DEBUG) {
     dump("-*- PackagedAppUtils: " + s + "\n");
@@ -25,7 +25,7 @@ function debug(s) {
 
 PackagedAppUtils.prototype = {
   classID: PACKAGEDAPPUTILS_CID,
-  contractID: PACKAGEDAPPSUTILS_CONTRACTID,
+  contractID: PACKAGEDAPPUTILS_CONTRACTID,
   classDescription: "Packaged App Utils",
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIPackagedAppUtils]),
 
