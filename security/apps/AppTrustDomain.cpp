@@ -12,6 +12,13 @@
 #include "nsNSSCertificate.h"
 #include "prerror.h"
 #include "secerr.h"
+#include "nsIFile.h"
+#include "nsLiteralString.h"
+#include "nsIFileStreams.h"
+#include "nsNetUtil.h"
+#include "nsAutoPtr.h"
+#include "nsIBinaryInputStream.h"
+#include <inttypes.h>
 
 // Generated in Makefile.in
 #include "marketplace-prod-public.inc"
@@ -29,6 +36,8 @@
 // Privileged Package Certificates
 #include "privileged-package-root.inc"
 
+//#define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "ETHAN", args)
+#define LOG(args...) printf_stderr(args)
 using namespace mozilla::pkix;
 
 extern PRLogModuleInfo* gPIPNSSLog;
@@ -47,6 +56,7 @@ AppTrustDomain::AppTrustDomain(ScopedCERTCertList& certChain, void* pinArg)
 SECStatus
 AppTrustDomain::SetTrustedRoot(AppTrustedRoot trustedRoot)
 {
+  LOG("JONATHAN: AppTrustDomain::SetTrustedRoot() trustedRoot = %" PRIu32, trustedRoot);
   SECItem trustedDER;
 
   // Load the trusted certificate into the in-memory NSS database so that
@@ -100,6 +110,42 @@ AppTrustDomain::SetTrustedRoot(AppTrustedRoot trustedRoot)
       trustedDER.data = const_cast<uint8_t*>(privilegedPackageRoot);
       trustedDER.len = mozilla::ArrayLength(privilegedPackageRoot);
       break;
+
+    case nsIX509CertDB::DeveloperTestingRoot: {
+      nsCOMPtr<nsIProperties> dirSvc(do_GetService("@mozilla.org/file/directory_service;1"));
+      if (!dirSvc) {
+        PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
+        return SECFailure;
+      }
+      nsCOMPtr<nsIFile> file;
+      nsresult rv = dirSvc->Get("TmpD", NS_GET_IID(nsIFile), getter_AddRefs(file));
+      printf_stderr("JONATHAN: dirSvc->Get() rv = %u\n", rv);
+      if (!file) {
+        PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
+        return SECFailure;
+      }
+      file->Append(NS_LITERAL_STRING("trusted_ca1.der"));
+      //file->Create(nsIFile::NORMAL_FILE_TYPE, 0600);
+      nsCOMPtr<nsIInputStream> inputStream;
+      rv = NS_NewLocalFileInputStream(
+          getter_AddRefs(inputStream), file, -1, -1, nsIFileInputStream::CLOSE_ON_EOF);
+      printf_stderr("JONATHAN: NS_NewLocalFileInputStream: rv = %u\n", rv);
+
+      nsCOMPtr<nsIBinaryInputStream> binaryInputStream(
+          do_CreateInstance("@mozilla.org/binaryinputstream;1"));
+      binaryInputStream->SetInputStream(inputStream);
+      uint64_t length;
+      rv = inputStream->Available(&length);
+      printf_stderr("JONATHAN: length: %" PRIu64 " %zu\n", length, mozilla::ArrayLength(privilegedPackageRoot));
+      binaryInputStream->ReadByteArray(length, &trustedDER.data);
+      for (uint64_t i = 0; i < length; i++) {
+        if (privilegedPackageRoot[i] != trustedDER.data[i]) {
+          printf_stderr("JONATHAN: differ at %" PRIu64 "\n", i);
+        }
+      }
+      trustedDER.len = length;
+      break;
+    }
 
     default:
       PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
