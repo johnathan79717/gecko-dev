@@ -1449,10 +1449,10 @@ pref("network.http.enforce-framing.soft", true);
 // See http://www.w3.org/TR/web-packaging/#streamable-package-format
 pref("network.http.enable-packaged-apps", false);
 
-// Enable this pref to skip verification process. The packaged app
-// will be considered signed no matter the package has a valid/invalid
-// signature or no signature.
+// Enable this pref to use your own certificate to verify the packages
 pref("network.http.packaged-apps-developer-mode", false);
+// The path to your own certificate
+pref("network.http.packaged-apps-developer-trusted-root", "");
 
 // default values for FTP
 // in a DSCP environment this should be 40 (0x28, or AF11), per RFC-4594,
