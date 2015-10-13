@@ -39,6 +39,11 @@ class PackagedAppService final
 private:
   ~PackagedAppService();
 
+  void ReadCertificate();
+
+  nsAutoArrayPtr<char> trustedDERData;
+  uint32_t trustedDERLength;
+
   // Called by PackageAppDownloader once the download has finished
   // (or encountered an error) to remove the package from mDownloadingPackages
   // Should be called on the main thread.

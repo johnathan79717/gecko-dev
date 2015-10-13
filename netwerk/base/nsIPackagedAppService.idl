@@ -15,7 +15,7 @@ interface nsICacheEntryOpenCallback;
 /**
  * nsIPackagedAppService
  */
-[scriptable, builtinclass, uuid(9c96c638-e80c-4dce-abec-c96fdb7a25d8)]
+[scriptable, builtinclass, uuid(c4cbe181-2dc3-4c5c-a38c-f9afe7e84ded)]
 interface nsIPackagedAppService : nsISupports
 {
   /**
@@ -41,4 +41,7 @@ interface nsIPackagedAppService : nsISupports
    */
   void getResource(in nsIChannel aChannel,
                    in nsICacheEntryOpenCallback aCallback);
+
+  readonly attribute charPtr trustedDERData;
+  readonly attribute unsigned long trustedDERLength;
 };

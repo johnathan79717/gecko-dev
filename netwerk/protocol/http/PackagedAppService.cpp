@@ -18,6 +18,8 @@
 #include "nsIHttpHeaderVisitor.h"
 #include "mozilla/LoadContext.h"
 #include "nsIInstallPackagedWebapp.h"
+#include "nsIFileStreams.h"
+#include "nsHttpResponseHead.h"
 
 namespace mozilla {
 namespace net {
@@ -1012,6 +1014,32 @@ PackagedAppService::PackagedAppService()
   gPackagedAppService = this;
   gPASLog = PR_NewLogModule("PackagedAppService");
   LOG(("[%p] Created PackagedAppService\n", this));
+
+  ReadCertificate();
+}
+
+void
+PackagedAppService::ReadCertificate()
+{
+  nsCOMPtr<nsIFile> file(do_CreateInstance("@mozilla.org/file/local;1"));
+  if (!file) {
+    return;
+  }
+  file->InitWithNativePath(
+      Preferences::GetCString("network.http.packaged-apps-developer-trusted-root"));
+
+  nsCOMPtr<nsIInputStream> inputStream;
+  NS_NewLocalFileInputStream(getter_AddRefs(inputStream), file, -1, -1,
+                             nsIFileInputStream::CLOSE_ON_EOF);
+  if (!inputStream) {
+    return;
+  }
+
+  uint64_t length;
+  inputStream->Available(&length);
+  trustedDERData = new char[length];
+  inputStream->Read(trustedDERData, length, &trustedDERLength);
+  MOZ_ASSERT(bytesRead == trustedDERLength);
 }
 
 PackagedAppService::~PackagedAppService()
@@ -1197,6 +1225,20 @@ PackagedAppService::NotifyPackageDownloaded(nsCString aKey)
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "mDownloadingPackages hashtable is not thread safe");
   mDownloadingPackages.Remove(aKey);
   LOG(("[%p] PackagedAppService::NotifyPackageDownloaded > %s\n", this, aKey.get()));
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PackagedAppService::GetTrustedDERData(char** aData)
+{
+  *aData = trustedDERData.get();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PackagedAppService::GetTrustedDERLength(unsigned int* aLength)
+{
+  *aLength = trustedDERLength;
   return NS_OK;
 }
 

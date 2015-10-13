@@ -12,14 +12,16 @@
 #include "nsNSSCertificate.h"
 #include "prerror.h"
 #include "secerr.h"
-#include "nsIFile.h"
-#include "nsLiteralString.h"
-#include "nsIFileStreams.h"
-#include "nsNetUtil.h"
-#include "nsAutoPtr.h"
-#include "nsIBinaryInputStream.h"
+#include "nsIPackagedAppService.h"
+//#include "nsIFile.h"
+//#include "nsLiteralString.h"
+//#include "nsIFileStreams.h"
+//#include "nsNetUtil.h"
+//#include "nsAutoPtr.h"
+//#include "nsIBinaryInputStream.h"
+#include "nsIServiceManager.h"
 #include <inttypes.h>
-#include "mozilla/Preferences.h"
+//#include "mozilla/Preferences.h"
 
 // Generated in Makefile.in
 #include "marketplace-prod-public.inc"
@@ -113,47 +115,20 @@ AppTrustDomain::SetTrustedRoot(AppTrustedRoot trustedRoot)
       break;
 
     case nsIX509CertDB::DeveloperTestingRoot: {
-      nsCOMPtr<nsIProperties> dirSvc(do_GetService("@mozilla.org/file/directory_service;1"));
-      if (!dirSvc) {
-        PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
-        return SECFailure;
-      }
-      //nsCOMPtr<nsIFile> file;
-      //nsresult rv = dirSvc->Get("TmpD", NS_GET_IID(nsIFile), getter_AddRefs(file));
-      //printf_stderr("JONATHAN: dirSvc->Get() rv = %u\n", rv);
-      //if (!file) {
-        //PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
-        //return SECFailure;
-      //}
-      //file->Append(NS_LITERAL_STRING("trusted_ca1.der"));
-      //file->Create(nsIFile::NORMAL_FILE_TYPE, 0600);
-      nsCOMPtr<nsIFile> file(do_CreateInstance("@mozilla.org/file/local;1"));
-      file->InitWithNativePath(
-          Preferences::GetCString("network.http.packaged-apps-developer-trusted-root"));
+      nsCOMPtr<nsIPackagedAppService> pkgSvc(
+          do_GetService("@mozilla.org/network/packaged-app-service;1"));
 
-      nsCOMPtr<nsIInputStream> inputStream;
-      NS_NewLocalFileInputStream(getter_AddRefs(inputStream), file, -1, -1,
-                                 nsIFileInputStream::CLOSE_ON_EOF);
-      if (!inputStream) {
-        printf_stderr("JONATHAN: Failed to find certificate in the path %s", 
-          Preferences::GetCString("network.http.packaged-apps-developer-trusted-root").get());
-        PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
-        return SECFailure;
-      }
+      char* data;
+      pkgSvc->GetTrustedDERData(&data);
+      trustedDER.data = reinterpret_cast<uint8_t*>(data);
+      pkgSvc->GetTrustedDERLength(&trustedDER.len);
 
-      nsCOMPtr<nsIBinaryInputStream> binaryInputStream(
-          do_CreateInstance("@mozilla.org/binaryinputstream;1"));
-      binaryInputStream->SetInputStream(inputStream);
-      uint64_t length;
-      inputStream->Available(&length);
-      printf_stderr("JONATHAN: length: %" PRIu64 " %zu\n", length, mozilla::ArrayLength(privilegedPackageRoot));
-      binaryInputStream->ReadByteArray(length, &trustedDER.data);
-      for (uint64_t i = 0; i < length; i++) {
+      printf_stderr("JONATHAN: length %" PRIu32 "\n", trustedDER.len);
+      for (uint32_t i = 0; i < trustedDER.len; i++) {
         if (privilegedPackageRoot[i] != trustedDER.data[i]) {
-          printf_stderr("JONATHAN: differ at %" PRIu64 "\n", i);
+          printf_stderr("JONATHAN: differ at %" PRIu32 "\n", i);
         }
       }
-      trustedDER.len = length;
       break;
     }
 
