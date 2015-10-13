@@ -30,9 +30,11 @@ class nsHttpResponseHead;
 // Downloading the package is triggered by calling getResource()
 class PackagedAppService final
   : public nsIPackagedAppService
+  , public nsIObserver
 {
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIPACKAGEDAPPSERVICE
+  NS_DECL_NSIOBSERVER
 
   PackagedAppService();
 

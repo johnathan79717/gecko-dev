@@ -123,6 +123,11 @@ AppTrustDomain::SetTrustedRoot(AppTrustedRoot trustedRoot)
       trustedDER.data = reinterpret_cast<uint8_t*>(data);
       pkgSvc->GetTrustedDERLength(&trustedDER.len);
 
+      if (!trustedDER.data) {
+        PR_SetError(SEC_ERROR_INVALID_ARGS, 0);
+        return SECFailure;
+      }
+
       printf_stderr("JONATHAN: length %" PRIu32 "\n", trustedDER.len);
       for (uint32_t i = 0; i < trustedDER.len; i++) {
         if (privilegedPackageRoot[i] != trustedDER.data[i]) {

@@ -25,6 +25,7 @@ namespace mozilla {
 namespace net {
 
 static PackagedAppService *gPackagedAppService = nullptr;
+static char kDeveloperTrustedRootPref[] = "network.http.packaged-apps-developer-trusted-root";
 
 static PRLogModuleInfo *gPASLog = nullptr;
 #undef LOG
@@ -1016,6 +1017,14 @@ PackagedAppService::PackagedAppService()
   LOG(("[%p] Created PackagedAppService\n", this));
 
   ReadCertificate();
+  Preferences::AddStrongObserver(this, kDeveloperTrustedRootPref);
+}
+
+NS_IMETHODIMP
+PackagedAppService::Observe(nsISupports* aSubject, const char* aTopic, const char16_t* aData)
+{
+  ReadCertificate();
+  return NS_OK;
 }
 
 void
@@ -1026,7 +1035,7 @@ PackagedAppService::ReadCertificate()
     return;
   }
   file->InitWithNativePath(
-      Preferences::GetCString("network.http.packaged-apps-developer-trusted-root"));
+      Preferences::GetCString(kDeveloperTrustedRootPref));
 
   nsCOMPtr<nsIInputStream> inputStream;
   NS_NewLocalFileInputStream(getter_AddRefs(inputStream), file, -1, -1,
